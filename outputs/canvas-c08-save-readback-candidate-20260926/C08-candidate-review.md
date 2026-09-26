@@ -1,6 +1,6 @@
 # C08 local candidate review
 
-**Status: uncompiled, unrun, and not sent to the existing cloud app.** All candidate `.pa.yaml` changes are in `workspace/Screen1.pa.yaml`. The other five YAML files are the unchanged current-app sync. No production or authoritative documentation was changed.
+**Status: Canvas MCP validation passed for all six YAML files; Studio save and runtime tests have not been performed.** All candidate `.pa.yaml` changes are in `workspace/Screen1.pa.yaml`. The other five YAML files are the unchanged current-app sync. No case rows, Excel files, flows, or publication settings were changed.
 
 ## Candidate behavior
 
@@ -16,7 +16,7 @@
 
 ## Assumptions and gaps
 
-- MCP schema read confirms `cr6cb_evidencecaseid` is a GUID primary key and `{Attachments}` is a `LazyTable`. `CountRows` on the returned attachment table, `Refresh` visibility timing, the formula types, and delegation behavior remain unverified until Canvas compile/runtime checks.
+- MCP schema read confirms `cr6cb_evidencecaseid` is a GUID primary key and `{Attachments}` is a `LazyTable`. Canvas compile passed, but `CountRows` on the returned attachment table, `Refresh` visibility timing, and delegation behavior remain unverified at runtime.
 - The candidate proves presence/count of one attachment related through the returned case row; it does not compare attachment content or filename.
 - Each `Refresh`, `LookUp`, and `CountRows` result has a separate error boundary. A failed refresh cannot fall through to a successful lookup/count sequence, and the readback-success flags are set only after the relevant individual operations succeed.
 - The local metadata `Patch` is checked before `varT001UnknownQueueId` is cleared or `ResetForm` runs. A missing/mismatched/error result leaves the queue and form intact and blocked.
@@ -28,8 +28,8 @@
 
 - `python tests/validate_candidate.py` passed: PyYAML parsed all six candidate `.pa.yaml` files; structural comparison against the latest committed readback sync found only the intended save/readback, per-queue unknown, save/cancel gating, and queue-label properties changed; other screens are unchanged; changed Power Fx text has balanced quotes and delimiters; the script checks that numeric conversion is error-handled, integer/min/max predicates are present, the error message surfaces each invalid class, and the branch structure that only the verified path resets the form, unknown paths retain the queue ID, and start filters to saved items.
 - These are YAML/lexical checks, not Power Fx compilation or behavioral tests.
-- `pac power-fx run` did not return expression results, so no behavior test is claimed. Canvas MCP compile and real API/runtime tests were not run.
+- `pac power-fx run` did not return expression results, so no behavior test is claimed. With the user's approval, one Canvas MCP `compile_canvas` call returned `Validation PASSED` for six files. A subsequent `sync_canvas` matched all six candidate files as text; Screen1's raw SHA-256 differed only because the sync used LF and the candidate copy used CRLF. Studio save and real API/runtime tests were not run.
 
 ## Review diff
 
-Compare `workspace/Screen1.pa.yaml` with `outputs/canvas-live-readback-20260926-demo-audit/Screen1.pa.yaml`. The diff is limited to `Form1.OnFailure`/`OnSuccess`, save-button gating, intake's global-state clearing, per-item labels, and cancel-button gating. The repeatable local YAML/structure check is `tests/validate_candidate.py`. Microsoft documents that `SubmitForm` validates before sending, does not submit invalid data, and still invokes `OnFailure` for validation failure; candidate logic uses `Form1.Valid` to keep that path out of the Unknown state. Dataverse documents Whole Number’s standard range as -2,147,483,648 through 2,147,483,647 ([column data types](https://learn.microsoft.com/en-us/power-apps/maker/data-platform/create-edit-field-solution-explorer)); the app’s business rule remains only “integer at least 1,” without adding a business-specific upper limit. The formula has not been compiled or runtime-verified: [SubmitForm reference](https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-form).
+Compare `workspace/Screen1.pa.yaml` with `outputs/canvas-live-readback-20260926-demo-audit/Screen1.pa.yaml`. The diff is limited to `Form1.OnFailure`/`OnSuccess`, save-button gating, intake's global-state clearing, per-item labels, and cancel-button gating. The repeatable local YAML/structure check is `tests/validate_candidate.py`. Microsoft documents that `SubmitForm` validates before sending, does not submit invalid data, and still invokes `OnFailure` for validation failure; candidate logic uses `Form1.Valid` to keep that path out of the Unknown state. Dataverse documents Whole Number’s standard range as -2,147,483,648 through 2,147,483,647 ([column data types](https://learn.microsoft.com/en-us/power-apps/maker/data-platform/create-edit-field-solution-explorer)); the app’s business rule remains only “integer at least 1,” without adding a business-specific upper limit. The formula compiled, but its runtime behavior has not been verified: [SubmitForm reference](https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-form).
