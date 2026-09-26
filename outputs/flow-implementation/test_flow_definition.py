@@ -1,6 +1,7 @@
 import copy
 import json
 import unittest
+from pathlib import Path
 
 from build_flow_definition import (
     build_api_request,
@@ -504,6 +505,80 @@ class FlowDefinitionTests(unittest.TestCase):
         self.assertIn("結果不明", actions)
         self.assertIn("停止", actions)
         self.assertIn("再実行", actions)
+
+    def test_validator_rejects_unsafe_copy_and_write_failure_mutations(self):
+        mutations = (
+            (
+                "copy automatic retry",
+                lambda actions: find_action(actions, "Copy_template")["inputs"].update(
+                    retryPolicy={"type": "exponential"}
+                ),
+            ),
+            (
+                "Excel write automatic retry",
+                lambda actions: find_action(actions, "Replace_template_row")["inputs"].pop(
+                    "retryPolicy"
+                ),
+            ),
+            (
+                "copy timeout bypasses unknown handler",
+                lambda actions: find_action(actions, "Update_case_copy_unknown").update(
+                    runAfter={"Copy_template": ["Failed"]}
+                ),
+            ),
+            (
+                "post-copy failure can mark success",
+                lambda actions: find_action(actions, "Update_case_postcopy_unknown")[
+                    "inputs"
+                ]["parameters"].update(
+                    item="@addProperty(json('{}'),'cr6cb_processingstatus','転記済み')"
+                ),
+            ),
+            (
+                "duplicate copy can create a second workbook",
+                lambda actions: find_action(actions, "Condition_One_Destination")[
+                    "actions"
+                ].update(
+                    Copy_template_duplicate=copy.deepcopy(find_action(actions, "Copy_template"))
+                    )
+            ),
+        )
+        for label, mutate in mutations:
+            with self.subTest(mutation=label):
+                candidate = build_excelurl_candidate()
+                actions = candidate["properties"]["definition"]["actions"]
+                mutate(actions)
+                self.assertTrue(
+                    validate_excelurl_candidate(candidate),
+                    f"validator accepted unsafe mutation: {label}",
+                )
+
+    def test_excelurl_validator_rejects_transaction_chain_in_no_destination_branch(self):
+        candidate = build_excelurl_candidate()
+        actions = candidate["properties"]["definition"]["actions"]
+        condition = find_action(actions, "Condition_One_Destination")
+        condition["else"]["actions"].update(condition["actions"])
+        condition["actions"] = {}
+
+        errors = validate_excelurl_candidate(candidate)
+
+        for action_name in (
+            "Copy_template",
+            "Scope_Write_And_Verify",
+            "Update_case_copy_unknown",
+            "Update_case_postcopy_unknown",
+        ):
+            self.assertIn(
+                f"{action_name} must remain under Condition_One_Destination success branch",
+                errors,
+            )
+
+    def test_current_c02_candidate_satisfies_local_failure_path_validator(self):
+        candidate_path = Path(__file__).with_name(
+            "flow-definition.excelurl-c02-local-candidate.json"
+        )
+        candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+        self.assertEqual(validate_excelurl_candidate(candidate), [])
 
     def test_validator_rejects_cycles_and_out_of_scope_run_after(self):
         import copy

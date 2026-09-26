@@ -782,6 +782,31 @@ def _excelurl_copy_destination_errors(actions: dict[str, Any]) -> list[str]:
     return errors
 
 
+def _excelurl_destination_branch_errors(actions: dict[str, Any]) -> list[str]:
+    """Keep the side-effect transaction under the one-destination true branch."""
+    errors: list[str] = []
+    condition = _find_action(actions, "Condition_One_Destination")
+    if not isinstance(condition, dict) or condition.get("type") != "If":
+        return ["Condition_One_Destination must guard the copy/write transaction"]
+
+    success_actions = condition.get("actions", {})
+    if not isinstance(success_actions, dict):
+        return ["Condition_One_Destination success branch must contain the transaction actions"]
+
+    required_actions = (
+        "Copy_template",
+        "Scope_Write_And_Verify",
+        "Update_case_copy_unknown",
+        "Update_case_postcopy_unknown",
+    )
+    for action_name in required_actions:
+        if _find_action(success_actions, action_name) is None:
+            errors.append(
+                f"{action_name} must remain under Condition_One_Destination success branch"
+            )
+    return errors
+
+
 def _excelurl_readback_gate_errors(actions: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     expected_dependencies = {
@@ -997,6 +1022,65 @@ def build_excelurl_candidate(
     return candidate
 
 
+def _side_effect_failure_path_errors(actions: dict[str, Any]) -> list[str]:
+    """Keep uncertain copy/write outcomes fail-closed in the local WDL candidate."""
+    errors: list[str] = []
+    side_effects = (
+        ("CopyDriveFileByPath", "Copy_template"),
+        ("PatchItem", "Replace_template_row"),
+    )
+    for operation, expected_action in side_effects:
+        matching_actions = []
+        for action_name, action in _all_actions(actions):
+            inputs = action.get("inputs", {}) if isinstance(action, dict) else {}
+            host = inputs.get("host", {}) if isinstance(inputs, dict) else {}
+            if isinstance(host, dict) and host.get("operationId") == operation:
+                matching_actions.append(action_name)
+        if matching_actions != [expected_action]:
+            errors.append(
+                f"{operation} must have exactly one side-effect action ({expected_action})"
+            )
+        action = _find_action(actions, expected_action)
+        inputs = action.get("inputs", {}) if isinstance(action, dict) else {}
+        if (
+            not isinstance(action, dict)
+            or not isinstance(inputs, dict)
+            or inputs.get("retryPolicy") != {"type": "none"}
+        ):
+            errors.append(f"{expected_action} must disable automatic side-effect retries")
+
+    handlers = (
+        (
+            "Update_case_copy_unknown",
+            {"Copy_template": ["Failed", "TimedOut"]},
+            "コピー処理の結果を確認できません。出力ファイルを確認し、状態が判明するまで再実行しないでください。",
+            "未確認",
+        ),
+        (
+            "Update_case_postcopy_unknown",
+            {"Scope_Write_And_Verify": ["Failed", "TimedOut"]},
+            "コピー後のExcel書込・読戻しを確認できません。出力ファイルを確認し、状態が判明するまで再実行しないでください。",
+            "読出不能",
+        ),
+    )
+    for action_name, expected_run_after, reason, excel_status in handlers:
+        action = _find_action(actions, action_name)
+        if not isinstance(action, dict):
+            errors.append(f"{action_name} must handle both failure and timeout")
+            continue
+        inputs = action.get("inputs", {}) if isinstance(action, dict) else {}
+        host = inputs.get("host", {}) if isinstance(inputs, dict) else {}
+        parameters = inputs.get("parameters", {}) if isinstance(inputs, dict) else {}
+        item = parameters.get("item", "") if isinstance(parameters, dict) else ""
+        if action.get("runAfter") != expected_run_after:
+            errors.append(f"{action_name} must handle both failure and timeout")
+        if not isinstance(host, dict) or host.get("operationId") != "UpdateOnlyRecord":
+            errors.append(f"{action_name} must use a non-upsert case update")
+        if item != _failure_item("結果不明", reason, excel_status):
+            errors.append(f"{action_name} must record an unknown outcome and prohibit rerun")
+    return errors
+
+
 def validate_excelurl_candidate(clientdata: dict[str, Any]) -> list[str]:
     errors = validate_clientdata(clientdata)
     if errors:
@@ -1004,7 +1088,9 @@ def validate_excelurl_candidate(clientdata: dict[str, Any]) -> list[str]:
 
     actions = clientdata["properties"]["definition"]["actions"]
     errors.extend(_excelurl_copy_destination_errors(actions))
+    errors.extend(_excelurl_destination_branch_errors(actions))
     errors.extend(_excelurl_readback_gate_errors(actions))
+    errors.extend(_side_effect_failure_path_errors(actions))
     expected_successes = (
         ("Condition_Readback_Matches", "Compose_ExcelUrl", "Update_case_success"),
         (
