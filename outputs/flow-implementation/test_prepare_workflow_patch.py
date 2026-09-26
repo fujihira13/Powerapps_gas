@@ -32,7 +32,12 @@ class WorkflowPatchPreflightTests(unittest.TestCase):
     def test_only_c02_validation_changes_are_allowed(self):
         changed = MODULE._check_only_c02_differences(self.synthetic_live, self.candidate)
         self.assertGreaterEqual(len(changed), 4)
-        self.assertTrue(all(MODULE._is_allowed(path) for path in changed))
+        self.assertTrue(
+            all(
+                MODULE._is_allowed(path, live=self.synthetic_live, candidate=self.candidate)
+                for path in changed
+            )
+        )
 
     def test_excel_url_change_is_rejected(self):
         live = copy.deepcopy(self.synthetic_live)
@@ -43,6 +48,35 @@ class WorkflowPatchPreflightTests(unittest.TestCase):
             "actions"]["Condition_Readback_Matches"]["actions"]["Compose_ExcelUrl"]["inputs"] += "-changed"
         with self.assertRaises(MODULE.PreflightError):
             MODULE._check_only_c02_differences(live, self.candidate)
+
+    def test_unexpected_changes_to_preexisting_same_named_actions_are_rejected(self):
+        note_path = (
+            "properties", "definition", "actions", "Condition_Start_Ready", "actions",
+            "Condition_One_Note", "actions",
+        )
+        mutations = (
+            (
+                "Compose_LogValidationReason",
+                lambda action: action.__setitem__("inputs", action["inputs"] + " unexpected"),
+            ),
+            (
+                "Update_case_stop_log_unreadable",
+                lambda action: action["inputs"]["parameters"].__setitem__(
+                    "item", action["inputs"]["parameters"]["item"] + " unexpected"
+                ),
+            ),
+        )
+        for action_name, mutate in mutations:
+            with self.subTest(action=action_name):
+                live = copy.deepcopy(self.candidate)
+                node = live
+                for part in note_path:
+                    node = node[part]
+                mutate(node[action_name])
+                with self.assertRaisesRegex(
+                    MODULE.PreflightError, "differences exceed C02 allowlist"
+                ):
+                    MODULE._check_only_c02_differences(live, self.candidate)
 
     def test_workflow_record_requires_etag_and_active_state(self):
         record = {

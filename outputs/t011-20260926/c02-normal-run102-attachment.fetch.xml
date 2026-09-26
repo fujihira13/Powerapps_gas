@@ -1,0 +1,11 @@
+<fetch>
+  <entity name="annotation">
+    <attribute name="annotationid" />
+    <attribute name="filename" />
+    <attribute name="filesize" />
+    <attribute name="mimetype" />
+    <filter type="and">
+      <condition attribute="objectid" operator="eq" value="25ba005c-76b9-f111-b377-7ced8d3141aa" />
+    </filter>
+  </entity>
+</fetch>

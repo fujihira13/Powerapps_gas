@@ -29,3 +29,10 @@ Thumbs.db
 *.bak
 *.swp
 ~$*
+
+# Local snapshot of a live flow definition used for rollback preflight
+outputs/t011-20260926/live-workflow-before-c02.json
+outputs/t011-20260926/c02-preflight-20260926/
+
+# Identical post-compile readback kept locally; the live readback is the evidence copy
+outputs/canvas-postcompile-readback-20260926-demo-audit/

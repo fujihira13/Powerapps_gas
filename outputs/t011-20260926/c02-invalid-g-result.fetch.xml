@@ -1,0 +1,11 @@
+<fetch>
+  <entity name="cr6cb_evidencecase">
+    <attribute name="cr6cb_evidencecaseid" />
+    <attribute name="cr6cb_processingstatus" />
+    <attribute name="cr6cb_excelcheckstatus" />
+    <attribute name="cr6cb_failurereason" />
+    <filter type="and">
+      <condition attribute="cr6cb_evidencecaseid" operator="eq" value="757e9bb1-73b9-f111-b377-7ced8d3141aa" />
+    </filter>
+  </entity>
+</fetch>

@@ -1,0 +1,13 @@
+<fetch>
+  <entity name="cr6cb_evidencedestination">
+    <attribute name="cr6cb_evidencedestinationid" />
+    <attribute name="cr6cb_environment" />
+    <attribute name="cr6cb_server" />
+    <attribute name="cr6cb_isactive" />
+    <filter type="and">
+      <condition attribute="cr6cb_isactive" operator="eq" value="1" />
+      <condition attribute="cr6cb_environment" operator="eq" value="架空環境A" />
+      <condition attribute="cr6cb_server" operator="eq" value="架空サーバーA" />
+    </filter>
+  </entity>
+</fetch>

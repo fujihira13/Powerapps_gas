@@ -1,0 +1,29 @@
+<fetch>
+  <entity name="cr6cb_evidencecase">
+    <attribute name="cr6cb_evidencecaseid" />
+    <attribute name="cr6cb_environment" />
+    <attribute name="cr6cb_server" />
+    <attribute name="cr6cb_runnumber" />
+    <attribute name="cr6cb_targetdate" />
+    <filter type="or">
+      <filter type="and">
+        <condition attribute="cr6cb_environment" operator="eq" value="架空環境G" />
+        <condition attribute="cr6cb_server" operator="eq" value="架空サーバーG" />
+        <condition attribute="cr6cb_runnumber" operator="eq" value="1" />
+        <condition attribute="cr6cb_targetdate" operator="on" value="2026-09-25" />
+      </filter>
+      <filter type="and">
+        <condition attribute="cr6cb_environment" operator="eq" value="架空環境D" />
+        <condition attribute="cr6cb_server" operator="eq" value="架空サーバーD" />
+        <condition attribute="cr6cb_runnumber" operator="eq" value="1" />
+        <condition attribute="cr6cb_targetdate" operator="on" value="2026-09-25" />
+      </filter>
+      <filter type="and">
+        <condition attribute="cr6cb_environment" operator="eq" value="架空環境H" />
+        <condition attribute="cr6cb_server" operator="eq" value="架空サーバーH" />
+        <condition attribute="cr6cb_runnumber" operator="eq" value="1" />
+        <condition attribute="cr6cb_targetdate" operator="on" value="2026-09-25" />
+      </filter>
+    </filter>
+  </entity>
+</fetch>

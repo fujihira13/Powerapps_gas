@@ -1,5 +1,5 @@
 {
-  "status": "local definition artifact; deployment and runtime status are tracked in docs/TASKS.md",
+  "status": "The C02 definition is reflected in the active Developer flow and exactly matches the immediate post-PATCH GET readback; remaining runtime checks and overall completion are tracked in docs/TASKS.md.",
   "scope": [
     "Power Apps (V2) caseId input",
     "Read one case and require processingstatus=開始受付済み",
@@ -7,29 +7,41 @@
     "Compare log date, environment, server, and run number with the case",
     "Require exactly one active destination mapping matching environment/server and the T006 folder",
     "Copy the T006 workbook to a fixed caseId filename with overwrite=false",
-    "Replace the template Evidence row, read it back, then mark 転記済み / 全文一致"
+    "Replace the template Evidence row, read it back, then mark 転記済み / 全文一致 and store the direct Excel URL"
   ],
   "static_validation": "passed",
   "verified_from_current_environment": [
     "All three connection references and connections are present in the Developer environment list; connection health was not tested",
     "Case and destination entity names/fields and T006 OneDrive item identifiers were supplied by read-only environment checks",
     "Current connector operation IDs and parameter names are documented by Microsoft Learn",
-    "The stored T002 flow confirms the CopyDriveFileByPath and Excel PatchItem action host/input structure; source uses the read-checked T006 template path"
+    "The stored T002 flow confirms the CopyDriveFileByPath and Excel PatchItem action host/input structure; source uses the read-checked T006 template path",
+    "A conditional PATCH to the existing flow returned HTTP 204; the immediate GET readback exactly matches flow-definition.excelurl-c02-local-candidate.json (SHA-256 917d7ec981b5490da494d8f5b3f14b58cf6b2ad723870360634d96ab60bbfe1b) and the flow is active",
+    "After the C02 update, invalid-calendar-date G, missing-date-line D, and missing-server-identifier H each stopped with a specific reason and produced zero Excel files",
+    "After the C02 update, normal regression A/A/run102 on 2026-09-26 used case 25ba005c-76b9-f111-b377-7ced8d3141aa and one 177-byte attachment; the case reached 転記済み / 全文一致 with an Excel URL, and SharePoint had one 8265-byte result workbook whose Evidence table had 9 columns, 1 row, and a full log-text match"
   ],
   "not_implemented": [
     "Recovery from failures outside the explicit copy/write/readback scopes; failure to update Dataverse status can leave a stale state",
-    "Concurrent-start locking and attempt/request identifiers",
-    "Long-log chunking or logs longer than 30000 characters",
-    "Writing excelurl; a share link is intentionally not created, and Copy output WebUrl is unconfirmed",
-    "Runtime verification of the Power Apps (V2) trigger serialization and connector operation execution",
-    "Power Automate Designer save/readback and execution of either approved fictitious log"
+    "Concurrent-start locking, conditional state transitions, and request/attempt identifiers",
+    "Safe retry of a confirmed no-side-effect failure (C04)",
+    "Confirmed-failure save recovery and same-case-ID resave with verified replacement attachment (C08)",
+    "Saved-case cancellation and same-case attachment replacement before start (C09)",
+    "Long-log chunking or logs longer than 30000 characters"
+  ],
+  "not_verified": [
+    "Runtime behavior when the attached-note body read fails or times out",
+    "C02 mixed run of an invalid case and an independent normal case after the update",
+    "C03 copy/write failure and externally uncertain outcomes, including recovery when a Dataverse status update fails",
+    "C04 safe-retry positive/negative cases and delayed or concurrent start responses",
+    "C08 save-request/attachment failure boundary, confirmed-absence query, and same-ID resave",
+    "C09 saved-case cancellation, reopen, attachment replacement, and start gating"
   ],
   "known_behavior": [
     "Copy and Excel write actions use retryPolicy=none. An empty initial readback triggers one explicit delayed, read-only GetItems requery; this is not a copy/write retry, and unresolved results remain 結果不明.",
     "Case ID is the fixed output filename; Copy uses overwrite=false. If a prior copy exists, the action fails and the flow does not retry.",
-    "Pre-copy validation failures are marked 停止 with a reason. Copy/write/readback failures are marked 結果不明 with a reason that says not to rerun until checked.",
+    "Pre-copy validation failures are marked 停止 with a reason; three C02 invalid-log cases passed this stop/reason/zero-Excel check after the update. Copy/write/readback failures are marked 結果不明 and must be checked before rerun.",
     "Review fields transfercheck, outcomejudgment, reviewcomment, reviewstatus, and reviewreason are never written.",
-    "A successful transfer stores processingstatus and excelcheckstatus only; excelurl remains unchanged."
+    "A successful transfer writes processingstatus, excelcheckstatus, and the direct excelurl only after verified readback; no sharing link is created.",
+    "The legacy B case remains 結果不明 and is preserved without rerun."
   ],
   "sources": [
     "https://learn.microsoft.com/en-us/power-automate/manage-flows-with-code",

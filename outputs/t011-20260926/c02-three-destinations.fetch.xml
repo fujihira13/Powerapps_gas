@@ -1,0 +1,25 @@
+<fetch>
+  <entity name="cr6cb_evidencedestination">
+    <attribute name="cr6cb_evidencedestinationid" />
+    <attribute name="cr6cb_environment" />
+    <attribute name="cr6cb_server" />
+    <attribute name="cr6cb_isactive" />
+    <filter type="and">
+      <condition attribute="cr6cb_isactive" operator="eq" value="1" />
+      <filter type="or">
+        <filter type="and">
+          <condition attribute="cr6cb_environment" operator="eq" value="架空環境G" />
+          <condition attribute="cr6cb_server" operator="eq" value="架空サーバーG" />
+        </filter>
+        <filter type="and">
+          <condition attribute="cr6cb_environment" operator="eq" value="架空環境D" />
+          <condition attribute="cr6cb_server" operator="eq" value="架空サーバーD" />
+        </filter>
+        <filter type="and">
+          <condition attribute="cr6cb_environment" operator="eq" value="架空環境H" />
+          <condition attribute="cr6cb_server" operator="eq" value="架空サーバーH" />
+        </filter>
+      </filter>
+    </filter>
+  </entity>
+</fetch>

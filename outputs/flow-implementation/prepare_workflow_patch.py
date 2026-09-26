@@ -35,8 +35,10 @@ ALLOWED_EXACT_PATHS = {
     "Update_case_stop_log_invalid/inputs/parameters/item",
 }
 ALLOWED_PREFIXES = (
-    f"{LOG_ACTION_ROOT}/Compose_LogValidationReason",
     f"{LOG_ACTION_ROOT}/Compose_IsValidLog/runAfter",
+)
+ALLOWED_NEW_ACTION_PREFIXES = (
+    f"{LOG_ACTION_ROOT}/Compose_LogValidationReason",
     f"{LOG_ACTION_ROOT}/Update_case_stop_log_unreadable",
 )
 
@@ -138,15 +140,44 @@ def changed_paths(live: dict[str, Any], candidate: dict[str, Any]) -> list[str]:
 _MISSING = object()
 
 
-def _is_allowed(path: str) -> bool:
+def _value_at_path(value: Any, path: str) -> Any:
+    current = value
+    for part in path.strip("/").split("/"):
+        if not isinstance(current, dict) or part not in current:
+            return _MISSING
+        current = current[part]
+    return current
+
+
+def _is_allowed(
+    path: str,
+    *,
+    live: dict[str, Any] | None = None,
+    candidate: dict[str, Any] | None = None,
+) -> bool:
     if path in ALLOWED_EXACT_PATHS:
         return True
-    return any(path == prefix or path.startswith(prefix + "/") for prefix in ALLOWED_PREFIXES)
+    if any(path == prefix or path.startswith(prefix + "/") for prefix in ALLOWED_PREFIXES):
+        return True
+    for prefix in ALLOWED_NEW_ACTION_PREFIXES:
+        if path == prefix or path.startswith(prefix + "/"):
+            # These subtrees were intended as new C02 actions. If a same-named
+            # action already exists in the live definition, require a separate
+            # reviewed leaf allowlist instead of accepting every nested change.
+            return (
+                live is not None
+                and candidate is not None
+                and _value_at_path(live, prefix) is _MISSING
+                and _value_at_path(candidate, prefix) is not _MISSING
+            )
+    return False
 
 
 def _check_only_c02_differences(live: dict[str, Any], candidate: dict[str, Any]) -> list[str]:
     paths = changed_paths(live, candidate)
-    unexpected = [path for path in paths if not _is_allowed(path)]
+    unexpected = [
+        path for path in paths if not _is_allowed(path, live=live, candidate=candidate)
+    ]
     if unexpected:
         # Paths contain action/property names only; never print field contents.
         summary = ", ".join(unexpected[:8])

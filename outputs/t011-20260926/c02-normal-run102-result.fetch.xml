@@ -1,0 +1,17 @@
+<fetch>
+  <entity name="cr6cb_evidencecase">
+    <attribute name="cr6cb_evidencecaseid" />
+    <attribute name="cr6cb_caselabel" />
+    <attribute name="cr6cb_environment" />
+    <attribute name="cr6cb_server" />
+    <attribute name="cr6cb_runnumber" />
+    <attribute name="cr6cb_targetdate" />
+    <attribute name="cr6cb_processingstatus" />
+    <attribute name="cr6cb_excelcheckstatus" />
+    <attribute name="cr6cb_excelurl" />
+    <attribute name="cr6cb_failurereason" />
+    <filter type="and">
+      <condition attribute="cr6cb_evidencecaseid" operator="eq" value="25ba005c-76b9-f111-b377-7ced8d3141aa" />
+    </filter>
+  </entity>
+</fetch>
