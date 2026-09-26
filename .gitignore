@@ -36,3 +36,6 @@ outputs/t011-20260926/c02-preflight-20260926/
 
 # Identical post-compile readback kept locally; the live readback is the evidence copy
 outputs/canvas-postcompile-readback-20260926-demo-audit/
+
+# Exact duplicate of the committed Canvas readback used for local C08 inspection
+outputs/canvas-c08-id-audit-stage-20260926/
