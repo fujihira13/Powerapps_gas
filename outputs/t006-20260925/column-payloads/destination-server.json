@@ -1,0 +1,24 @@
+{
+  "@odata.type": "Microsoft.Dynamics.CRM.StringAttributeMetadata",
+  "AttributeType": "String",
+  "AttributeTypeName": {
+    "Value": "StringType"
+  },
+  "SchemaName": "cr6cb_Server",
+  "DisplayName": {
+    "@odata.type": "Microsoft.Dynamics.CRM.Label",
+    "LocalizedLabels": [
+      {
+        "Label": "サーバー",
+        "LanguageCode": 1041
+      }
+    ]
+  },
+  "RequiredLevel": {
+    "Value": "ApplicationRequired"
+  },
+  "FormatName": {
+    "Value": "Text"
+  },
+  "MaxLength": 100
+}

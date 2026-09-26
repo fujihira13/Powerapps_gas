@@ -1,0 +1,2 @@
+2026-09-23 10:00:00 INFO fictional-job-b started
+2026-09-23 10:00:03 INFO fictional-job-b completed

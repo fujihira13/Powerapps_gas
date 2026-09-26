@@ -1,0 +1,31 @@
+# Local credentials and private configuration
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.pem
+*.key
+*.publishsettings
+
+# Generated build and test files
+**/bin/
+**/obj/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+node_modules/
+TestResults/
+
+# Editor, OS, and temporary files
+*.user
+*.suo
+.vs/
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+*.bak
+*.swp
+~$*

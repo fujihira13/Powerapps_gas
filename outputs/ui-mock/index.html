@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>架空ログ証跡アプリ・4画面モック</title>
+  <style>
+    :root{font-family:"Segoe UI","Yu Gothic UI",Meiryo,sans-serif;color:#17243b;background:#eef3f9}
+    *{box-sizing:border-box}body{margin:0}button,input,select,textarea{font:inherit}
+    button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.45}
+    .harness{background:#253247;color:#fff;padding:12px clamp(16px,4vw,48px);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    .harness strong{font-size:15px}.harness small{display:block;color:#dbe6f5;margin-top:3px}.harness-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .harness button{border:1px solid #94abc7;border-radius:6px;background:#fff;color:#22354f;padding:8px 14px;font-size:13px}.guide{width:100%;font-size:13px}.guide summary{cursor:pointer;font-weight:700}.guide ol{margin:8px 0 0;padding-left:22px;line-height:1.7;color:#e7f0fc}
+    .app{max-width:1500px;margin:22px auto;background:#fff;min-height:min(850px,calc(100vh - 100px));box-shadow:0 16px 45px #1a3e6a1a;border:1px solid #ccdbed;border-radius:9px;overflow:hidden}
+    .page{display:none}.page.active{display:block}.page-header{background:#18549a;color:white;padding:22px clamp(20px,4vw,52px);display:flex;align-items:center;justify-content:space-between;gap:20px}
+    h1{font-size:clamp(26px,3vw,40px);line-height:1.2;letter-spacing:.04em;margin:0}h2{font-size:22px;margin:0 0 20px}h3{font-size:17px;margin:0 0 13px}
+    .page-header .identity{font-size:14px;color:#e8f1ff;text-align:right}
+    .intake-grid{display:grid;grid-template-columns:minmax(310px,38%) 1fr;min-height:620px}
+    .intake-list{border-right:8px solid #e4eaf2;padding:26px 0}.list-top{padding:0 24px 20px}.case-list{display:flex;flex-direction:column}
+    .case-row{border:0;border-bottom:1px solid #e3e9f2;background:#fff;text-align:left;padding:18px 24px;display:flex;gap:14px;align-items:center;min-height:77px;color:#21344f}
+    .case-row:hover,.case-row.selected{background:#eaf3ff}.case-row .fileicon{font-size:27px;color:#567191}.case-row strong{display:block;font-size:18px;font-weight:600;overflow-wrap:anywhere}.case-row small{display:block;color:#697a90;margin-top:4px}
+    .empty{padding:30px 24px;color:#6b7c91}.details{padding:36px clamp(20px,4vw,52px)}.details .filename{font-size:29px;font-weight:700;margin:0 0 30px;overflow-wrap:anywhere}
+    .form-grid{display:grid;grid-template-columns:minmax(120px,180px) minmax(190px,470px);gap:17px 22px;align-items:center;max-width:780px}.form-grid label{font-size:19px;font-weight:600}
+    input,select,textarea{border:1px solid #a9bdd6;border-radius:7px;background:white;color:#17243b;padding:11px 14px;min-height:46px;width:100%}input:disabled,select:disabled,textarea:disabled{background:#f1f4f8;color:#627289}
+    textarea{min-height:90px;resize:vertical}.actions{display:flex;gap:11px;flex-wrap:wrap;margin-top:30px}.actions.end{justify-content:flex-end}
+    .btn{border:1px solid #9cb3cf;border-radius:8px;background:#fff;color:#164a87;padding:12px 22px;font-weight:700;min-height:48px}
+    .btn.primary{background:#1160bd;border-color:#1160bd;color:white}.btn.danger{color:#c3232a;border-color:#e1a5a7}.btn:hover:not(:disabled){filter:brightness(.96)}
+    .footer{padding:24px clamp(20px,4vw,52px);border-top:1px solid #dce5ef;display:flex;justify-content:flex-end;background:#fafcff}
+    .content{padding:30px clamp(20px,4vw,52px) 45px}.cards{display:grid;gap:16px}.card{border:1px solid #cbd9e9;border-radius:9px;background:#fff;padding:22px;box-shadow:0 3px 13px #183d6910}
+    .card-title{font-weight:700;font-size:20px;overflow-wrap:anywhere}.meta{display:flex;gap:14px 24px;flex-wrap:wrap;color:#425a78;font-size:14px;margin-top:9px}.status-grid{display:grid;grid-template-columns:repeat(3,minmax(130px,1fr));gap:12px;margin-top:18px}
+    .status{background:#f5f8fc;border:1px solid #e2eaf4;border-radius:6px;padding:10px 12px;min-height:65px}.status small{color:#687a91;display:block;margin-bottom:5px}.status b{font-size:15px}.card .actions{margin-top:18px}
+    .two-col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.label{color:#566b84;font-size:13px;font-weight:700;margin-bottom:8px}.data-box{border:1px solid #d4e0ed;border-radius:7px;padding:15px;background:#fbfdff;min-height:70px;overflow:auto}.log{white-space:pre-wrap;line-height:1.6;margin:0;font-size:14px}.mock-sheet{width:100%;border-collapse:collapse;font-size:14px}.mock-sheet th,.mock-sheet td{border:1px solid #cdd9e6;text-align:left;padding:9px}.mock-sheet th{background:#edf4fb;width:35%}
+    .field-stack{display:grid;gap:16px;max-width:780px}.field-stack label{font-weight:700}.field-stack .field{display:grid;gap:8px}.choice{display:flex;gap:18px;flex-wrap:wrap}.choice label{font-weight:400;display:flex;gap:7px;align-items:center}.choice input{width:auto;min-height:0;accent-color:#155fba}
+    .notice{background:#edf5ff;border-left:4px solid #2b74c4;padding:13px 16px;margin:18px 0;color:#244b7d}.notice.warning{background:#fff5ee;border-color:#ce6a35;color:#75421d}.muted{color:#73849a}.subsection{margin-top:28px;padding-top:25px;border-top:1px solid #e1e8f1}.review-summary{display:grid;gap:8px}
+    @media(max-width:850px){.intake-grid,.two-col{grid-template-columns:1fr}.intake-list{border-right:0;border-bottom:8px solid #e4eaf2}.details{padding-top:24px}.status-grid{grid-template-columns:repeat(2,minmax(130px,1fr))}.page-header{align-items:flex-start;flex-direction:column}}
+    @media(max-width:540px){.app{margin:0;border-radius:0}.form-grid{grid-template-columns:1fr;gap:7px}.form-grid label:not(:first-child){margin-top:8px}.status-grid{grid-template-columns:1fr}.content{padding-top:22px}.btn{width:100%}}
+  </style>
+</head>
+<body>
+  <aside class="harness" aria-label="画面確認用の操作">
+    <div><strong>4画面の操作モック</strong><small>ここは確認用の操作欄です。架空データはこのタブ内だけにあり、保存・Excel作成・レビュー記録の外部送信はしません。</small></div>
+    <div class="harness-actions"><button id="load-demo">架空の例を読み込む</button><button id="confirm-excel">Excel実反映を確認した例にする</button><button id="unknown-result">結果不明の例にする</button><button id="show-progress" disabled>進捗一覧を見る</button><button id="reset-demo">初期状態へ戻す</button></div>
+    <details class="guide"><summary>使い方を表示</summary><ol><li>「架空の例を読み込む」で4件を表示します。</li><li>画面下の「処理開始」で進捗一覧へ進みます。</li><li>レビューを試す場合は、上部の「Excel実反映を確認した例にする」を押します。</li><li>normal-a.txtの「件を確認」から「一致」「正常」を選び、「確認を記録」「レビューを依頼」を押します。</li><li>進捗一覧の「レビューを確認」から「レビュアー役に切り替える」を押し、「確認済み」または「差し戻し」を選びます。</li></ol></details>
+  </aside>
+  <main class="app" id="app">
+    <section class="page" id="intake">
+      <header class="page-header"><h1>受付・対象確認</h1></header>
+      <div class="intake-grid">
+        <div class="intake-list"><div class="list-top"><button class="btn" id="choose-log">ログを選ぶ</button><input type="file" id="log-file" accept=".txt,text/plain" multiple hidden></div><div id="intake-list-items" class="case-list"></div></div>
+        <div class="details" id="intake-detail"></div>
+      </div>
+      <footer class="footer"><button class="btn primary" id="start-processing">処理開始</button></footer>
+    </section>
+    <section class="page" id="progress"><header class="page-header"><h1>進捗一覧</h1></header><div class="content"><div id="progress-cards" class="cards"></div><div class="actions"><button class="btn" id="back-intake">受付へ戻る</button></div></div></section>
+    <section class="page" id="case-detail"><header class="page-header"><h1>件ごとの確認</h1><span class="identity" id="detail-identity"></span></header><div class="content" id="case-body"></div></section>
+    <section class="page" id="review"><header class="page-header"><h1>レビュー</h1><span class="identity" id="review-identity"></span></header><div class="content" id="review-body"></div></section>
+  </main>
+  <script>
+    const $=id=>document.getElementById(id);
+    const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    const destinations={'架空環境A':['架空サーバーA','架空サーバーB'],'架空環境E':['架空サーバーE']};
+    let cases=[], selected=null, active=null, screen='intake', role='担当者役', editing=false, replaceId=null, counter=0;
+    const current=()=>cases.find(item=>item.id===selected);
+    const activeCase=()=>cases.find(item=>item.id===active);
+    const dateOk=value=>/^\d{4}-\d{2}-\d{2}$/.test(value)&&!Number.isNaN(Date.parse(value+'T00:00:00'));
+    const valid=item=>item&&!item.cancelled&&!item.started&&item.save==='保存済み'&&item.env&&item.server&&destinations[item.env]?.includes(item.server)&&Number.isInteger(Number(item.run))&&Number(item.run)>=1&&dateOk(item.date);
+    const identity=item=>`${esc(item.env||'—')} / ${esc(item.server||'—')} / 実行回 ${esc(item.run||'—')} / ${esc(item.date||'—')}`;
+    function addCase(data){const item={id:'mock-'+(++counter),name:data.name||`log_${counter}.txt`,text:data.text||'',env:data.env||'',server:data.server||'',run:data.run||'',date:data.date||'',save:data.save||'保存済み',process:'未処理',excel:'未確認',excelRows:[],compare:'',judgment:'',comment:'',review:'',reviewReason:'',cancelled:false,recorded:false,dirtyAfterReturn:false,reason:'',...data};cases.push(item);selected=item.id;return item}
+    function loadDemo(){cases=[];counter=0;addCase({name:'normal-a.txt',env:'架空環境A',server:'架空サーバーA',run:'1',date:'2026-09-25',text:'処理日: 2026-09-25\n環境: 架空環境A\nサーバー: 架空サーバーA\n実行回: 1\n処理結果: 正常\n詳細: 架空の夜間処理が完了しました。'});addCase({name:'abnormal.txt',env:'架空環境E',server:'架空サーバーE',run:'1',date:'2026-09-25',text:'処理日: 2026-09-25\n環境: 架空環境E\nサーバー: 架空サーバーE\n実行回: 1\n処理結果: 異常\n詳細: 架空の処理で確認対象のエラーが発生しました。'});addCase({name:'destination-removed.txt',env:'架空環境C',server:'架空サーバーC',run:'1',date:'2026-09-25',text:'処理日: 2026-09-25\n環境: 架空環境C\nサーバー: 架空サーバーC\n実行回: 1\n処理結果: 正常'});addCase({name:'excel-failed.txt',env:'架空環境A',server:'架空サーバーB',run:'2',date:'2026-09-25',failOnStart:true,text:'処理日: 2026-09-25\n環境: 架空環境A\nサーバー: 架空サーバーB\n実行回: 2\n処理結果: 正常'});selected=cases[0].id;active=null;editing=false;role='担当者役';go('intake')}
+    function resetDemo(){cases=[];selected=null;active=null;editing=false;replaceId=null;role='担当者役';counter=0;go('intake')}
+    function go(name){screen=name;document.querySelectorAll('.page').forEach(page=>page.classList.toggle('active',page.id===name));render()}
+    function render(){$('show-progress').disabled=!cases.some(item=>item.started);if(screen==='intake')renderIntake();if(screen==='progress')renderProgress();if(screen==='case-detail')renderCase();if(screen==='review')renderReview()}
+    function renderIntake(){
+      $('intake-list-items').innerHTML=cases.length?cases.map(item=>`<button class="case-row ${item.id===selected?'selected':''}" data-select="${item.id}"><span class="fileicon">▤</span><span><strong>${esc(item.name)}</strong><small>${item.cancelled?'取消':item.reason||item.save}</small></span></button>`).join(''):'<div class="empty">ログはまだ選ばれていません。</div>';
+      const item=current();const detail=$('intake-detail');
+      if(!item){detail.innerHTML='<div class="empty">ログを選ぶと、件ごとの情報がここに表示されます。</div>';}
+      else{
+        const enabled=editing&&!item.started;const envs=[...Object.keys(destinations)];if(item.env&&!envs.includes(item.env))envs.unshift(item.env);const options=envs.map(env=>`<option value="${esc(env)}" ${item.env===env?'selected':''} ${destinations[env]?'':'disabled'}>${esc(env)}</option>`).join('');
+        const servers=[...(destinations[item.env]||[])];if(item.server&&!servers.includes(item.server))servers.unshift(item.server);
+        detail.innerHTML=`<p class="filename">${esc(item.name)}</p>${item.save==='保存できませんでした'?'<div class="notice warning">保存できませんでした</div>':''}${item.save==='結果未確認'?'<div class="notice warning">保存状況を確認しています</div>':''}${item.reason?`<div class="notice warning">${esc(item.reason)}</div>`:''}
+          <div class="form-grid"><label for="environment">環境</label><select id="environment" ${enabled?'':'disabled'}><option value="">選択してください</option>${options}</select>
+          <label for="server">サーバー</label><select id="server" ${enabled?'':'disabled'}><option value="">選択してください</option>${servers.map(server=>`<option value="${esc(server)}" ${item.server===server?'selected':''}>${esc(server)}</option>`).join('')}</select>
+          <label for="run">実行回</label><input id="run" inputmode="numeric" type="number" min="1" step="1" value="${esc(item.run)}" ${enabled?'':'disabled'}>
+          <label for="target-date">対象処理日</label><input id="target-date" type="date" value="${esc(item.date)}" ${enabled?'':'disabled'}></div>
+          <div class="actions end"><button class="btn" id="edit-case" ${item.started||item.save==='結果未確認'?'disabled':''}>修正</button><button class="btn danger" id="cancel-case" ${item.started||item.save==='結果未確認'||item.cancelled?'disabled':''}>取消</button></div>`;
+        $('edit-case').onclick=()=>{if(item.cancelled){replaceId=item.id;editing=false;}else editing=true;renderIntake()};
+        $('cancel-case').onclick=()=>{item.cancelled=true;editing=false;renderIntake()};
+        if(enabled){$('environment').onchange=e=>{item.env=e.target.value;item.server='';renderIntake()};$('server').onchange=e=>{item.server=e.target.value};$('run').oninput=e=>{item.run=e.target.value};$('target-date').onchange=e=>{item.date=e.target.value}}
+      }
+      document.querySelectorAll('[data-select]').forEach(button=>button.onclick=()=>{selected=button.dataset.select;replaceId=null;editing=false;renderIntake()});
+      $('start-processing').disabled=!cases.some(valid);
+    }
+    function makeRows(item){return [['処理日',item.date],['環境',item.env],['サーバー',item.server],['実行回',item.run],['処理結果',item.text.match(/^処理結果:\s*(.*)$/m)?.[1]||'—']]}
+    function startProcessing(){const ready=cases.filter(valid);if(!ready.length)return;ready.forEach(item=>{const logDate=item.text.match(/^処理日:\s*(\d{4}-\d{2}-\d{2})\s*$/m)?.[1];const logEnv=item.text.match(/^環境:\s*(.*)$/m)?.[1];const logServer=item.text.match(/^サーバー:\s*(.*)$/m)?.[1];const logRun=item.text.match(/^実行回:\s*(.*)$/m)?.[1];const badDate=!logDate||logDate!==item.date;const badIdentity=!logEnv||!logServer||!logRun||logEnv!==item.env||logServer!==item.server||logRun!==String(item.run);const failed=item.failOnStart||badDate||badIdentity;item.started=true;item.process=failed?'停止':'処理完了';item.excel='未確認';item.excelRows=failed?[]:makeRows(item);item.reason=badDate?'処理日不一致':badIdentity?'ログ識別情報不一致':item.failOnStart?'Excel未作成':'';item.excelMissingConfirmed=Boolean(item.failOnStart&&!badDate&&!badIdentity)});cases.filter(item=>!item.cancelled&&!item.started).forEach(item=>{if(!destinations[item.env]?.includes(item.server))item.reason='転記先未登録';});editing=false;go('progress')}
+    function confirmExcel(){cases.filter(item=>item.process==='処理完了'&&item.excelRows.length).forEach(item=>item.excel='反映確認済み');render()}
+    function showUnknown(){const item=cases.find(entry=>entry.started&&entry.process==='処理完了'&&!entry.review);if(!item)return;item.process='停止';item.excel='未確認';item.excelRows=[];item.reason='結果未確認';item.excelMissingConfirmed=false;item.recorded=false;role='担当者役';active=item.id;go('progress')}
+    function renderProgress(){const started=cases.filter(item=>item.started||item.reason);$('progress-cards').innerHTML=started.length?started.map(item=>`<article class="card"><div class="card-title">${esc(item.name)}</div><div class="meta"><span>環境 ${esc(item.env||'—')}</span><span>サーバー ${esc(item.server||'—')}</span><span>実行回 ${esc(item.run||'—')}</span><span>対象処理日 ${esc(item.date||'—')}</span></div><div class="status-grid"><div class="status"><small>ログ保存</small><b>${esc(item.save)}</b></div><div class="status"><small>転記処理</small><b>${esc(item.process)}</b></div><div class="status"><small>Excel実反映</small><b>${esc(item.excel)}</b></div><div class="status"><small>転記照合</small><b>${esc(item.compare||'—')}</b></div><div class="status"><small>処理結果の判断</small><b>${esc(item.judgment||'—')}</b></div><div class="status"><small>レビュー</small><b>${esc(item.review||'—')}</b></div></div>${item.reason?`<div class="notice warning">${esc(item.reason)}</div>`:''}<div class="actions"><button class="btn" data-open-case="${item.id}" ${item.started?'':'disabled'}>件を確認</button><button class="btn" data-open-review="${item.id}" ${['依頼中','再依頼','差し戻し','確認済み'].includes(item.review)?'':'disabled'}>レビューを確認</button></div></article>`).join(''):'<div class="empty">件はまだありません。</div>';
+      document.querySelectorAll('[data-open-case]').forEach(button=>button.onclick=()=>{active=button.dataset.openCase;go('case-detail')});document.querySelectorAll('[data-open-review]').forEach(button=>button.onclick=()=>{active=button.dataset.openReview;role='担当者役';go('review')});$('back-intake').style.display=cases.some(item=>item.reason==='転記先未登録')?'':'none';
+    }
+    function renderCase(){const item=activeCase();if(!item){go('progress');return}$('detail-identity').textContent=`${item.env} / ${item.server} / 実行回 ${item.run} / ${item.date}`;
+      const sheet=item.excelRows.length?`<table class="mock-sheet">${item.excelRows.map(([key,val])=>`<tr><th>${esc(key)}</th><td>${esc(val)}</td></tr>`).join('')}</table>`:'<span class="muted">—</span>';
+      const compareChoices=['一致','不一致','確認保留'];const judgmentChoices=['正常','異常','判断保留'];
+      $('case-body').innerHTML=`<div class="two-col"><section><h2>元ログ</h2><div class="data-box"><pre class="log">${esc(item.text)}</pre></div></section><section><h2>証跡Excel</h2><div class="data-box">${sheet}</div><div class="meta"><span>実反映の確認　${esc(item.excel)}</span></div></section></div>
+      ${item.reason?`<div class="notice warning">${esc(item.reason)}</div>`:''}<div class="subsection"><div class="field-stack"><div class="field"><label>転記内容の照合</label><div class="choice">${compareChoices.map(v=>`<label><input type="radio" name="compare" value="${v}" ${item.compare===v?'checked':''} ${item.review==='確認済み'?'disabled':''}>${v}</label>`).join('')}</div></div>
+      <div class="field"><label>処理結果の判断</label><div class="choice">${judgmentChoices.map(v=>`<label><input type="radio" name="judgment" value="${v}" ${item.judgment===v?'checked':''} ${item.review==='確認済み'?'disabled':''}>${v}</label>`).join('')}</div></div>
+      <div class="field"><label for="comment">コメント</label><textarea id="comment" ${item.review==='確認済み'?'disabled':''}>${esc(item.comment)}</textarea></div></div>
+      <div class="actions"><button class="btn primary" id="record-check" ${item.review==='確認済み'||role==='レビュアー役'?'disabled':''}>確認を記録</button><button class="btn" id="request-review" ${role==='レビュアー役'||item.excel!=='反映確認済み'||!item.recorded||item.review==='確認済み'||['依頼中','再依頼'].includes(item.review)||item.review==='差し戻し'&&!item.dirtyAfterReturn?'disabled':''}>${item.review==='差し戻し'?'再依頼':'レビューを依頼'}</button><button class="btn" id="retry-case" ${item.process==='停止'&&item.excelMissingConfirmed?'':'disabled'}>この件を再実行</button><button class="btn" id="case-back">一覧に戻る</button></div></div>`;
+      $('record-check').onclick=()=>{const compare=document.querySelector('input[name="compare"]:checked')?.value||'';const judgment=document.querySelector('input[name="judgment"]:checked')?.value||'';const comment=$('comment').value.trim();if(!compare||!judgment||(['異常','判断保留'].includes(judgment)&&!comment))return;item.compare=compare;item.judgment=judgment;item.comment=comment;item.recorded=true;if(item.review==='差し戻し')item.dirtyAfterReturn=true;renderCase()};
+      $('request-review').onclick=()=>{if(item.excel!=='反映確認済み'||!item.recorded||item.review==='確認済み')return;item.review=item.review==='差し戻し'?'再依頼':'依頼中';item.dirtyAfterReturn=false;go('progress')};
+      $('retry-case').onclick=()=>{if(!item.excelMissingConfirmed||item.process!=='停止')return;item.failOnStart=false;item.excelMissingConfirmed=false;item.process='処理完了';item.reason='';item.excel='未確認';item.excelRows=makeRows(item);go('progress')};$('case-back').onclick=()=>{role='担当者役';go('progress')};
+    }
+    function renderReview(){const item=activeCase();if(!item){go('progress');return}$('review-identity').textContent=`${item.env} / ${item.server} / 実行回 ${item.run} / ${item.date}`;
+      $('review-body').innerHTML=`<div class="two-col"><section class="card"><h2>担当者の確認</h2><div class="review-summary"><span>転記内容の照合　<strong>${esc(item.compare||'—')}</strong></span><span>処理結果の判断　<strong>${esc(item.judgment||'—')}</strong></span><span>コメント　<strong>${esc(item.comment||'—')}</strong></span></div></section><section class="card"><h2>レビュー</h2><div class="review-summary"><span>依頼　<strong>${esc(item.review||'—')}</strong></span><span>結果　<strong>${['確認済み','差し戻し'].includes(item.review)?esc(item.review):'—'}</strong></span>${item.reviewReason?`<span>差し戻し理由　<strong>${esc(item.reviewReason)}</strong></span>`:''}<span>実演上の役割　<strong>${role}</strong></span></div><div class="actions"><button class="btn" id="switch-role" ${role==='レビュアー役'||item.review==='確認済み'?'disabled':''}>レビュアー役に切り替える</button></div></section></div>
+      <div class="subsection"><div class="field-stack"><div class="field"><label>レビュー結果</label><div class="choice"><label><input type="radio" name="review-result" value="確認済み" ${role==='レビュアー役'&&['依頼中','再依頼'].includes(item.review)?'':'disabled'}>確認済み</label><label><input type="radio" name="review-result" value="差し戻し" ${role==='レビュアー役'&&['依頼中','再依頼'].includes(item.review)?'':'disabled'}>差し戻し</label></div></div><div class="field"><label for="return-reason">差し戻し理由</label><textarea id="return-reason" ${role==='レビュアー役'&&['依頼中','再依頼'].includes(item.review)?'':'disabled'}></textarea></div></div>
+      <div class="actions"><button class="btn primary" id="save-review" ${role==='レビュアー役'&&['依頼中','再依頼'].includes(item.review)?'':'disabled'}>レビュー結果を記録</button><button class="btn" id="review-case">件の内容を確認</button><button class="btn" id="review-back">一覧に戻る</button></div></div>`;
+      $('switch-role').onclick=()=>{role='レビュアー役';renderReview()};$('save-review').onclick=()=>{const result=document.querySelector('input[name="review-result"]:checked')?.value;const reason=$('return-reason').value.trim();if(!result||result==='差し戻し'&&!reason)return;item.review=result;item.reviewReason=result==='差し戻し'?reason:'';role='担当者役';go('progress')};$('review-case').onclick=()=>go('case-detail');$('review-back').onclick=()=>{role='担当者役';go('progress')};
+    }
+    $('load-demo').onclick=()=>{replaceId=null;loadDemo()};$('reset-demo').onclick=resetDemo;$('confirm-excel').onclick=confirmExcel;$('unknown-result').onclick=showUnknown;$('show-progress').onclick=()=>go('progress');
+    $('choose-log').onclick=()=>$('log-file').click();
+    $('log-file').onchange=async event=>{const files=[...event.target.files];for(const file of files){if(!file.name.toLowerCase().endsWith('.txt'))continue;if(replaceId){const item=cases.find(entry=>entry.id===replaceId);if(item){item.name=file.name;item.text=await file.text();item.cancelled=false;item.reason='';selected=item.id}replaceId=null;break}else addCase({name:file.name,text:await file.text()})}event.target.value='';editing=true;renderIntake()};
+    $('start-processing').onclick=startProcessing;$('back-intake').onclick=()=>{selected=cases.find(item=>item.reason==='転記先未登録')?.id||selected;editing=false;go('intake')};
+    resetDemo();
+  </script>
+</body>
+</html>

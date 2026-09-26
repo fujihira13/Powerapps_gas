@@ -1,0 +1,124 @@
+Screens:
+  Screen2:
+    Properties:
+      Fill: =RGBA(243, 246, 250, 1)
+      LoadingSpinnerColor: =RGBA(0, 96, 160, 1)
+      OnVisible: =Refresh('架空ログ証跡件')
+    Children:
+      - lblS02Title:
+          Control: Label
+          Properties:
+            Color: =RGBA(25, 54, 92, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Bold
+            Height: =52
+            Size: =If(Parent.Width < 360, 22, 28)
+            Text: ="進捗一覧"
+            Width: =Parent.Width - 224
+            X: =24
+            Y: =18
+      - btnS02NewIntake:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="新しい件を受付"
+            Appearance: ='ButtonCanvas.Appearance'.Secondary
+            Height: =42
+            OnSelect: =Navigate(Screen1, ScreenTransition.None)
+            Text: ="新しい件を受付"
+            Width: =166
+            X: =Parent.Width - 190
+            Y: =23
+      - galS02Cases:
+          Control: Gallery
+          Variant: Vertical
+          Properties:
+            AccessibleLabel: ="処理状況の一覧"
+            Height: =Parent.Height - 104
+            Items: =SortByColumns('架空ログ証跡件', "modifiedon", SortOrder.Descending)
+            TemplateSize: =226
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =82
+          Children:
+            - lblS02Identity:
+                Control: Label
+                Properties:
+                  Color: =RGBA(25, 54, 92, 1)
+                  Font: =Font.'Segoe UI'
+                  FontWeight: =FontWeight.Semibold
+                  Height: =34
+                  Size: =18
+                  Text: =ThisItem.'件の表示名' & "　" & ThisItem.環境 & " / " & ThisItem.サーバー & " / 実行回 " & Text(ThisItem.実行回) & " / " & Text(ThisItem.'対象処理日', "[$-ja-JP]yyyy-mm-dd")
+                  Width: =Parent.TemplateWidth - 32
+                  X: =16
+                  Y: =8
+            - lblS02Processing:
+                Control: Label
+                Properties:
+                  Color: =RGBA(42, 57, 75, 1)
+                  Font: =Font.'Segoe UI'
+                  Height: =30
+                  Text: |-
+                    ="ログ保存: 保存済み　　転記処理: " & Switch(ThisItem.cr6cb_processingstatus, "保存済み", "未処理", "取消", "未処理", "開始受付済み", "処理中", "処理中", "処理中", "停止", "停止", "結果不明", "停止", "転記済み", "処理完了", "未処理") & "　　Excel実反映: " & If(ThisItem.cr6cb_excelcheckstatus = "全文一致", "反映確認済み", Coalesce(ThisItem.cr6cb_excelcheckstatus, "未確認"))
+                  Width: =Parent.TemplateWidth - 32
+                  X: =16
+                  Y: =48
+            - lblS02HumanChecks:
+                Control: Label
+                Properties:
+                  Color: =RGBA(42, 57, 75, 1)
+                  Font: =Font.'Segoe UI'
+                  Height: =28
+                  Text: |-
+                    ="転記照合: " & Coalesce(ThisItem.cr6cb_transfercheck, "—") & "　　処理結果の判断: " & Coalesce(ThisItem.cr6cb_outcomejudgment, "—") & "　　レビュー: " & Coalesce(ThisItem.cr6cb_reviewstatus, "未依頼")
+                  Width: =Parent.TemplateWidth - 32
+                  X: =16
+                  Y: =80
+            - lblS02Failure:
+                Control: Label
+                Properties:
+                  AutoHeight: =true
+                  Color: =RGBA(163, 38, 45, 1)
+                  Font: =Font.'Segoe UI'
+                  Height: =28
+                  Text: =ThisItem.cr6cb_failurereason
+                  Visible: =!IsBlank(ThisItem.cr6cb_failurereason)
+                  Width: =Parent.TemplateWidth - 32
+                  X: =16
+                  Y: =110
+            - btnS02OpenCase:
+                Control: Button
+                Properties:
+                  AccessibleLabel: ="件を確認"
+                  Appearance: ='ButtonCanvas.Appearance'.Primary
+                  Height: =42
+                  OnSelect: =Set(varEvidenceCase, ThisItem); Navigate(Screen3, ScreenTransition.None)
+                  Text: ="件を確認"
+                  Width: =150
+                  X: =16
+                  Y: =170
+            - btnS02OpenReview:
+                Control: Button
+                Properties:
+                  AccessibleLabel: ="レビューを確認"
+                  Appearance: ='ButtonCanvas.Appearance'.Secondary
+                  DisplayMode: =If(ThisItem.cr6cb_reviewstatus = "依頼中" || ThisItem.cr6cb_reviewstatus = "再依頼" || ThisItem.cr6cb_reviewstatus = "差し戻し" || ThisItem.cr6cb_reviewstatus = "確認済み", DisplayMode.Edit, DisplayMode.Disabled)
+                  Height: =42
+                  OnSelect: =Set(varEvidenceCase, ThisItem); Set(varDemoRole, "担当者役"); Navigate(Screen4, ScreenTransition.None)
+                  Text: ="レビューを確認"
+                  Width: =170
+                  X: =178
+                  Y: =170
+            - btnS02BackIntake:
+                Control: Button
+                Properties:
+                  AccessibleLabel: ="受付へ戻る"
+                  Appearance: ='ButtonCanvas.Appearance'.Secondary
+                  DisplayMode: =If(ThisItem.cr6cb_processingstatus = "保存済み" && !IsBlank(ThisItem.cr6cb_failurereason), DisplayMode.Edit, DisplayMode.Disabled)
+                  Height: =42
+                  OnSelect: =Set(varT001SelectedQueueId, Blank()); Navigate(Screen1, ScreenTransition.None)
+                  Text: ="受付へ戻る"
+                  Visible: =ThisItem.cr6cb_processingstatus = "保存済み" && !IsBlank(ThisItem.cr6cb_failurereason)
+                  Width: =150
+                  X: =362
+                  Y: =170

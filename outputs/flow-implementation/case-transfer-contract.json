@@ -1,0 +1,49 @@
+{
+  "status": "local draft; no cloud flow created",
+  "model": "one case per flow run",
+  "trigger": {
+    "type": "Power Apps (V2)",
+    "input": {"name": "caseId", "type": "Text", "format": "GUID", "required": true},
+    "canvas_call": "Flow.Run(ThisItem.EvidenceCaseId)",
+    "meaning": "The app passes only the saved case row ID. The flow re-reads all values from Dataverse."
+  },
+  "reads": [
+    "Get the case row by caseId.",
+    "Continue only when processingstatus is 開始受付済み. The Canvas save step sets 保存済み; a separate accepted start changes it to 開始受付済み. A canceled, merely saved, already processing, or already transferred case exits without writing.",
+    "List document notes related to the case; continue only if exactly one attachment exists.",
+    "Read the source note filename and Base64 documentbody.",
+    "List active destination rows matching the environment/server pair; continue only when exactly one row matches."
+  ],
+  "checks": [
+    "Check that the case has environment, server, positive integer run number, and target date.",
+    "Decode the note body as UTF-8; require the first line to be 処理日: YYYY-MM-DD and require the date to equal targetdate.",
+    "Require the log body environment, server, and run number to match the saved case."
+  ],
+  "writes": [
+    "Set processingstatus to 処理中 before external file work.",
+    "Copy the prepared workbook to the fixed T006 relative folder path as <caseId>.xlsx with overwrite disabled.",
+    "Use the copied workbook's Evidence table. Replace the __TEMPLATE__ row with the first chunk and add one row per remaining chunk.",
+    "Split at 30000 UTF-16 code units without separating a surrogate pair. Store ChunkIndex and ChunkCount.",
+    "Read the Evidence rows back, order by ChunkIndex, and compare case ID, filename, four fields, and reconstructed full text.",
+    "On an exact match, set processingstatus=転記済み, excelcheckstatus=全文一致, and excelurl to the copied file URL.",
+    "On validation failure, set processingstatus=停止 and failurereason. If a copied workbook exists but the write/read outcome cannot be established, set processingstatus=結果不明 and do not start a second copy."
+  ],
+  "flow_must_not_write": [
+    "transfercheck",
+    "outcomejudgment",
+    "reviewcomment",
+    "reviewstatus",
+    "reviewreason"
+  ],
+  "result_contract": {
+    "return_to_canvas": "No direct response is required; Canvas re-reads the case row.",
+    "persisted_fields": ["processingstatus", "excelcheckstatus", "failurereason", "excelurl"]
+  },
+  "first_pass_limits": [
+    "No automatic retry.",
+    "One fixed T006 destination folder; the mapping table is still checked for the environment/server pair.",
+    "Stop when a case has zero or multiple attached document notes.",
+    "No server-side API validation of Text choice values.",
+    "A prior run's file must be investigated manually if the result is unknown."
+  ]
+}

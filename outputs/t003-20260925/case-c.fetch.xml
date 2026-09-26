@@ -1,0 +1,12 @@
+<fetch>
+  <entity name="cr6cb_t001">
+    <attribute name="cr6cb_logname" />
+    <attribute name="cr6cb_environmentname" />
+    <attribute name="cr6cb_servername" />
+    <attribute name="cr6cb_runnumber" />
+    <attribute name="cr6cb_targetdate" />
+    <filter>
+      <condition attribute="cr6cb_logname" operator="eq" value="mock-log-c.txt" />
+    </filter>
+  </entity>
+</fetch>

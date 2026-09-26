@@ -1,0 +1,1082 @@
+Screens:
+  Screen1:
+    Properties:
+      Fill: =RGBA(255, 255, 255, 1)
+      LoadingSpinnerColor: =RGBA(0, 120, 212, 1)
+      OnVisible: |-
+        =If(
+          Coalesce(varS01NewIntakeRequested, false),
+          Set(varS01NewIntakeRequested, false);
+          If(
+            !Coalesce(varT001Saving, false) &&
+            IsBlank(varT001SavingQueueId) &&
+            !Coalesce(varS01Starting, false) &&
+            !Coalesce(varS01StartUnknown, false) &&
+            IsBlank(varT001UnknownQueueId) &&
+            Coalesce(varS01FlowStatus, "") <> "開始状況を確認しています" &&
+            CountIf(colS01StartResults, Outcome = "結果不明") = 0 &&
+            IsEmpty(Filter(colT001Metadata, Coalesce(SaveStatus, "") <> "保存済み" || IsBlank(EvidenceCaseId))),
+            Clear(colT001Metadata);
+            Clear(colT001AttachmentSource);
+            Set(varT001SelectedQueueId, Blank());
+            Set(varT001Saved, Blank());
+            Set(varEvidenceCase, Blank());
+            Set(varS01FlowStatus, "");
+            Clear(colS01StartResults);
+            ResetForm(Form1);
+            NewForm(Form1)
+          )
+        )
+    Children:
+      - Form1:
+          Control: Form
+          Variant: Classic
+          Layout: Vertical
+          Properties:
+            BorderColor: =RGBA(245, 245, 245, 1)
+            DataSource: ='架空ログ証跡件'
+            DefaultMode: =FormMode.New
+            Height: =Parent.Height - 140
+            NumberOfColumns: =2
+            OnFailure: =Set(varT001Saving, false); Set(varT001UnknownQueueId, varT001SavingQueueId); Notify("保存状況を確認しています", NotificationType.Warning)
+            OnSuccess: =Set(varT001Saved, Form1.LastSubmit); Set(varEvidenceCase, Form1.LastSubmit); IfError(Set(varEvidenceCase, Patch('架空ログ証跡件', Form1.LastSubmit, {cr6cb_processingstatus:"保存済み", cr6cb_excelcheckstatus:"未確認", cr6cb_reviewstatus:"未依頼"})), Notify("保存は完了しましたが、状態の初期化を確認できませんでした", NotificationType.Warning)); Set(varT001UnknownQueueId, Blank()); Patch(colT001Metadata, LookUp(colT001Metadata, QueueId = varT001SavingQueueId), {SaveStatus:"保存済み", EvidenceCaseId:Form1.LastSubmit.'架空ログ証跡件'}); Set(varT001Saving, false); Set(varT001SelectedQueueId, varT001SavingQueueId); Set(varT001SavingQueueId, Blank()); ResetForm(Form1); NewForm(Form1)
+            Width: =Parent.Width - 360
+            X: =320
+            Y: =40
+          Children:
+            - ログ名_DataCard1:
+                Control: TypedDataCard
+                Variant: ClassicTextualEdit
+                IsLocked: true
+                Properties:
+                  BorderColor: =RGBA(245, 245, 245, 1)
+                  DataField: ="cr6cb_caselabel"
+                  Default: =ThisItem.'件の表示名'
+                  DisplayName: ="ログ"
+                  MaxLength: =DataSourceInfo([@'架空ログ証跡件'], DataSourceInfo.MaxLength, '件の表示名')
+                  Required: =true
+                  Update: =DataCardValue1.Text
+                  Width: =266
+                  X: =0
+                  Y: =0
+                Children:
+                  - DataCardKey1:
+                      Control: Label
+                      MetadataKey: FieldName
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =34
+                        PaddingLeft: =0
+                        Text: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        Wrap: =false
+                        X: =30
+                        Y: =10
+                  - DataCardValue1:
+                      Control: Classic/TextInput
+                      MetadataKey: FieldValue
+                      Properties:
+                        BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                        Color: =RGBA(50, 49, 48, 1)
+                        Default: =Coalesce(LookUp(colT001Metadata, QueueId = varT001SelectedQueueId).FileName, "")
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        DisplayMode: =DisplayMode.View
+                        Font: =Font.'Segoe UI'
+                        HoverBorderColor: =RGBA(16, 110, 190, 1)
+                        HoverColor: =RGBA(50, 49, 48, 1)
+                        HoverFill: =RGBA(255, 255, 255, 1)
+                        MaxLength: =Parent.MaxLength
+                        PaddingLeft: =5
+                        PressedBorderColor: =RGBA(0, 120, 212, 1)
+                        PressedColor: =RGBA(50, 49, 48, 1)
+                        PressedFill: =RGBA(255, 255, 255, 1)
+                        RadiusBottomLeft: =0
+                        RadiusBottomRight: =0
+                        RadiusTopLeft: =0
+                        RadiusTopRight: =0
+                        Tooltip: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardKey1.Y + DataCardKey1.Height + 5
+                  - ErrorMessage1:
+                      Control: Label
+                      MetadataKey: ErrorMessage
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(168, 0, 0, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(168, 0, 0, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =10
+                        Live: =Live.Assertive
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Text: =Parent.Error
+                        Visible: =Parent.DisplayMode=DisplayMode.Edit
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardValue1.Y + DataCardValue1.Height
+                  - StarVisible1:
+                      Control: Label
+                      MetadataKey: FieldRequired
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =DataCardKey1.Height
+                        PaddingLeft: =0
+                        Text: ="*"
+                        Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                        Width: =30
+                        Wrap: =false
+                        Y: =DataCardKey1.Y
+            - 環境名_DataCard1:
+                Control: TypedDataCard
+                Variant: ClassicTextualEdit
+                IsLocked: true
+                Properties:
+                  BorderColor: =RGBA(245, 245, 245, 1)
+                  DataField: ="cr6cb_environment"
+                  Default: =ThisItem.環境
+                  DisplayName: ="環境"
+                  MaxLength: =DataSourceInfo([@'架空ログ証跡件'], DataSourceInfo.MaxLength, 環境)
+                  Required: =true
+                  Update: =DataCardValue2.Selected.Value
+                  Width: =(Parent.Width / 2) - 12
+                  X: =1
+                  Y: =0
+                Children:
+                  - DataCardKey2:
+                      Control: Label
+                      MetadataKey: FieldName
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =34
+                        PaddingLeft: =0
+                        Text: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        Wrap: =false
+                        X: =30
+                        Y: =10
+                  - DataCardValue2:
+                      Control: Classic/DropDown
+                      MetadataKey: FieldValue
+                      Properties:
+                        BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                        Color: =RGBA(50, 49, 48, 1)
+                        Default: =Coalesce(LookUp(colT001Metadata, QueueId = varT001SelectedQueueId).EnvironmentName, "")
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        DisplayMode: =If(Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, Parent.DisplayMode)
+                        Font: =Font.'Segoe UI'
+                        HoverBorderColor: =RGBA(16, 110, 190, 1)
+                        HoverColor: =RGBA(50, 49, 48, 1)
+                        HoverFill: =RGBA(255, 255, 255, 1)
+                        Items: =Sort(Distinct(Filter('架空ログ転記先', cr6cb_isactive = '有効 (架空ログ転記先)'.有効), cr6cb_environment), Value)
+                        Items.Value: =Value
+                        PaddingLeft: =5
+                        PressedBorderColor: =RGBA(0, 120, 212, 1)
+                        PressedColor: =RGBA(50, 49, 48, 1)
+                        PressedFill: =RGBA(255, 255, 255, 1)
+                        Tooltip: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardKey2.Y + DataCardKey2.Height + 5
+                  - ErrorMessage2:
+                      Control: Label
+                      MetadataKey: ErrorMessage
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(168, 0, 0, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(168, 0, 0, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =10
+                        Live: =Live.Assertive
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Text: =Parent.Error
+                        Visible: =Parent.DisplayMode=DisplayMode.Edit
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardValue2.Y + DataCardValue2.Height
+                  - StarVisible2:
+                      Control: Label
+                      MetadataKey: FieldRequired
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =DataCardKey2.Height
+                        PaddingLeft: =0
+                        Text: ="*"
+                        Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                        Width: =30
+                        Wrap: =false
+                        Y: =DataCardKey2.Y
+            - サーバー名_DataCard1:
+                Control: TypedDataCard
+                Variant: ClassicTextualEdit
+                IsLocked: true
+                Properties:
+                  BorderColor: =RGBA(245, 245, 245, 1)
+                  DataField: ="cr6cb_server"
+                  Default: =ThisItem.サーバー
+                  DisplayName: ="サーバー"
+                  MaxLength: =DataSourceInfo([@'架空ログ証跡件'], DataSourceInfo.MaxLength, サーバー)
+                  Required: =true
+                  Update: =DataCardValue3.Selected.Value
+                  Width: =(Parent.Width / 2) - 12
+                  X: =0
+                  Y: =1
+                Children:
+                  - DataCardKey3:
+                      Control: Label
+                      MetadataKey: FieldName
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =34
+                        PaddingLeft: =0
+                        Text: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        Wrap: =false
+                        X: =30
+                        Y: =10
+                  - DataCardValue3:
+                      Control: Classic/DropDown
+                      MetadataKey: FieldValue
+                      Properties:
+                        BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                        Color: =RGBA(50, 49, 48, 1)
+                        Default: =Coalesce(LookUp(colT001Metadata, QueueId = varT001SelectedQueueId).ServerName, "")
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        DisplayMode: =If(Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, Parent.DisplayMode)
+                        Font: =Font.'Segoe UI'
+                        HoverBorderColor: =RGBA(16, 110, 190, 1)
+                        HoverColor: =RGBA(50, 49, 48, 1)
+                        HoverFill: =RGBA(255, 255, 255, 1)
+                        Items: =Sort(Distinct(Filter('架空ログ転記先', cr6cb_isactive = '有効 (架空ログ転記先)'.有効 && cr6cb_environment = DataCardValue2.Selected.Value), cr6cb_server), Value)
+                        Items.Value: =Value
+                        PaddingLeft: =5
+                        PressedBorderColor: =RGBA(0, 120, 212, 1)
+                        PressedColor: =RGBA(50, 49, 48, 1)
+                        PressedFill: =RGBA(255, 255, 255, 1)
+                        Tooltip: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardKey3.Y + DataCardKey3.Height + 5
+                  - ErrorMessage3:
+                      Control: Label
+                      MetadataKey: ErrorMessage
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(168, 0, 0, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(168, 0, 0, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =10
+                        Live: =Live.Assertive
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Text: =Parent.Error
+                        Visible: =Parent.DisplayMode=DisplayMode.Edit
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardValue3.Y + DataCardValue3.Height
+                  - StarVisible3:
+                      Control: Label
+                      MetadataKey: FieldRequired
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =DataCardKey3.Height
+                        PaddingLeft: =0
+                        Text: ="*"
+                        Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                        Width: =30
+                        Wrap: =false
+                        Y: =DataCardKey3.Y
+            - 実行回数_DataCard1:
+                Control: TypedDataCard
+                Variant: ClassicNumberEdit
+                IsLocked: true
+                Properties:
+                  BorderColor: =RGBA(245, 245, 245, 1)
+                  DataField: ="cr6cb_runnumber"
+                  Default: =ThisItem.実行回
+                  DisplayName: ="実行回"
+                  Required: =true
+                  Update: =If(IsBlank(DataCardValue4.Text), Blank(), Value(DataCardValue4.Text))
+                  Width: =(Parent.Width / 2) - 12
+                  X: =1
+                  Y: =1
+                Children:
+                  - DataCardKey4:
+                      Control: Label
+                      MetadataKey: FieldName
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =34
+                        PaddingLeft: =0
+                        Text: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        Wrap: =false
+                        X: =30
+                        Y: =10
+                  - DataCardValue4:
+                      Control: Classic/TextInput
+                      MetadataKey: FieldValue
+                      Properties:
+                        BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                        Color: =RGBA(50, 49, 48, 1)
+                        Default: =If(IsBlank(LookUp(colT001Metadata, QueueId = varT001SelectedQueueId).RunNumber), Blank(), Text(LookUp(colT001Metadata, QueueId = varT001SelectedQueueId).RunNumber))
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        DisplayMode: =If(Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, Parent.DisplayMode)
+                        Font: =Font.'Segoe UI'
+                        Format: =TextFormat.Number
+                        HoverBorderColor: =RGBA(16, 110, 190, 1)
+                        HoverColor: =RGBA(50, 49, 48, 1)
+                        HoverFill: =RGBA(255, 255, 255, 1)
+                        PaddingLeft: =5
+                        PressedBorderColor: =RGBA(0, 120, 212, 1)
+                        PressedColor: =RGBA(50, 49, 48, 1)
+                        PressedFill: =RGBA(255, 255, 255, 1)
+                        RadiusBottomLeft: =0
+                        RadiusBottomRight: =0
+                        RadiusTopLeft: =0
+                        RadiusTopRight: =0
+                        Tooltip: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardKey4.Y + DataCardKey4.Height + 5
+                  - ErrorMessage4:
+                      Control: Label
+                      MetadataKey: ErrorMessage
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(168, 0, 0, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(168, 0, 0, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =10
+                        Live: =Live.Assertive
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Text: =Parent.Error
+                        Visible: =Parent.DisplayMode=DisplayMode.Edit
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardValue4.Y + DataCardValue4.Height
+                  - StarVisible4:
+                      Control: Label
+                      MetadataKey: FieldRequired
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =DataCardKey4.Height
+                        PaddingLeft: =0
+                        Text: ="*"
+                        Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                        Width: =30
+                        Wrap: =false
+                        Y: =DataCardKey4.Y
+            - 対象処理日_DataCard1:
+                Control: TypedDataCard
+                Variant: ClassicDateTimeEdit
+                IsLocked: true
+                Properties:
+                  BorderColor: =RGBA(245, 245, 245, 1)
+                  DataField: ="cr6cb_targetdate"
+                  Default: =ThisItem.対象処理日
+                  DisplayName: ="対象処理日"
+                  Required: =true
+                  Update: =DateValue1.SelectedDate
+                  Width: =(Parent.Width / 2) - 12
+                  X: =0
+                  Y: =2
+                Children:
+                  - DataCardKey5:
+                      Control: Label
+                      MetadataKey: FieldName
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =34
+                        PaddingLeft: =0
+                        Text: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        Wrap: =false
+                        X: =30
+                        Y: =10
+                  - DateValue1:
+                      Control: Classic/DatePicker
+                      MetadataKey: DateFieldValue
+                      Properties:
+                        BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                        Color: =RGBA(50, 49, 48, 1)
+                        DefaultDate: =LookUp(colT001Metadata, QueueId = varT001SelectedQueueId).TargetDate
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        DisplayMode: =If(Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, Parent.DisplayMode)
+                        EndYear: =Year(Today())+100
+                        Fill: =RGBA(245, 245, 245, 1)
+                        Font: =Font.'Segoe UI'
+                        Format: ="[$-ja-JP]yyyy-mm-dd"
+                        IconBackground: =RGBA(0, 120, 212, 1)
+                        IconFill: =RGBA(255, 255, 255, 1)
+                        IsEditable: =true
+                        PaddingBottom: =0
+                        PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0)
+                        Size: =13
+                        StartYear: =1899
+                        Tooltip: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardKey5.Y + DataCardKey5.Height + 5
+                  - HourValue1:
+                      Control: Classic/DropDown
+                      MetadataKey: HourFieldValue
+                      Properties:
+                        BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                        ChevronBackground: =RGBA(245, 245, 245, 1)
+                        ChevronDisabledBackground: =RGBA(242, 242, 241, 0)
+                        ChevronDisabledFill: =RGBA(161, 159, 157, 1)
+                        ChevronFill: =RGBA(50, 49, 48, 1)
+                        ChevronHoverBackground: =RGBA(245, 245, 245, 1)
+                        ChevronHoverFill: =RGBA(50, 49, 48, 1)
+                        Color: =RGBA(50, 49, 48, 1)
+                        Default: =Text(Hour(Parent.Default),"00")
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        DisplayMode: =If(Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, Parent.DisplayMode)
+                        Fill: =RGBA(245, 245, 245, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =DateValue1.Height
+                        HoverBorderColor: =RGBA(16, 110, 190, 1)
+                        HoverColor: =RGBA(50, 49, 48, 1)
+                        HoverFill: =RGBA(245, 245, 245, 1)
+                        Items: =["00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23"]
+                        Items.Value: =Value
+                        PaddingBottom: =5
+                        PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0)
+                        PaddingRight: =5
+                        PaddingTop: =5
+                        PressedBorderColor: =RGBA(16, 110, 190, 1)
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(0, 120, 212, 1)
+                        SelectionColor: =RGBA(50, 49, 48, 1)
+                        SelectionFill: =RGBA(0, 120, 212, 1)
+                        Tooltip: =Parent.DisplayName
+                        Visible: =false
+                        Width: =DateValue1.Width / 2 - 10
+                        X: =DateValue1.X + DateValue1.Width + 10
+                        Y: =DateValue1.Y
+                  - Separator1:
+                      Control: Label
+                      MetadataKey: HourMinuteSeparator
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Bold
+                        Height: =HourValue1.Height
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Text: =":"
+                        Visible: =false
+                        Width: =10
+                        Wrap: =false
+                        X: =HourValue1.X + HourValue1.Width
+                        Y: =HourValue1.Y
+                  - MinuteValue1:
+                      Control: Classic/DropDown
+                      MetadataKey: MinuteFieldValue
+                      Properties:
+                        BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                        ChevronBackground: =RGBA(245, 245, 245, 1)
+                        ChevronDisabledBackground: =RGBA(242, 242, 241, 0)
+                        ChevronDisabledFill: =RGBA(161, 159, 157, 1)
+                        ChevronFill: =RGBA(50, 49, 48, 1)
+                        ChevronHoverBackground: =RGBA(245, 245, 245, 1)
+                        ChevronHoverFill: =RGBA(50, 49, 48, 1)
+                        Color: =RGBA(50, 49, 48, 1)
+                        Default: =Text(Minute(Parent.Default),"00")
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        DisplayMode: =If(Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, Parent.DisplayMode)
+                        Fill: =RGBA(245, 245, 245, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =HourValue1.Height
+                        HoverBorderColor: =RGBA(16, 110, 190, 1)
+                        HoverColor: =RGBA(50, 49, 48, 1)
+                        HoverFill: =RGBA(245, 245, 245, 1)
+                        Items: =["00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36","37","38","39","40","41","42","43","44","45","46","47","48","49","50","51","52","53","54","55","56","57","58","59"]
+                        Items.Value: =Value
+                        PaddingBottom: =5
+                        PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0)
+                        PaddingRight: =5
+                        PaddingTop: =5
+                        PressedBorderColor: =RGBA(16, 110, 190, 1)
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(0, 120, 212, 1)
+                        SelectionColor: =RGBA(50, 49, 48, 1)
+                        SelectionFill: =RGBA(0, 120, 212, 1)
+                        Tooltip: =Parent.DisplayName
+                        Visible: =false
+                        Width: =HourValue1.Width
+                        X: =HourValue1.X + HourValue1.Width + Separator1.Width
+                        Y: =HourValue1.Y
+                  - ErrorMessage5:
+                      Control: Label
+                      MetadataKey: ErrorMessage
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(168, 0, 0, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(168, 0, 0, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =10
+                        Live: =Live.Assertive
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Text: =Parent.Error
+                        Visible: =Parent.DisplayMode=DisplayMode.Edit
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =HourValue1.Y + HourValue1.Height
+                  - StarVisible5:
+                      Control: Label
+                      MetadataKey: FieldRequired
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =DataCardKey5.Height
+                        PaddingLeft: =0
+                        Text: ="*"
+                        Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                        Width: =30
+                        Wrap: =false
+                        Y: =DataCardKey5.Y
+            - Attachments_DataCard1:
+                Control: TypedDataCard
+                Variant: ClassicAttachmentsEdit
+                IsLocked: true
+                Properties:
+                  BorderColor: =RGBA(245, 245, 245, 1)
+                  DataField: ="{Attachments}"
+                  Default: =ThisItem.Attachments
+                  DisplayName: ="ログ"
+                  Required: =true
+                  Update: =With({meta:LookUp(colT001Metadata, QueueId = varT001SelectedQueueId)}, If(IsBlank(meta), FirstN(colT001AttachmentSource, 0), LastN(FirstN(colT001AttachmentSource, meta.SourceIndex), 1)))
+                  Width: =(Parent.Width / 2) - 12
+                  X: =1
+                  Y: =2
+                Children:
+                  - DataCardKey6:
+                      Control: Label
+                      MetadataKey: FieldName
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =34
+                        PaddingLeft: =0
+                        Text: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        Wrap: =false
+                        X: =30
+                        Y: =10
+                  - DataCardValue5:
+                      Control: Attachments
+                      MetadataKey: FieldValue
+                      Properties:
+                        BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                        BorderStyle: =BorderStyle.None
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        DisplayMode: =If(Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, If(IsEmpty(colT001Metadata), Parent.DisplayMode, DisplayMode.View))
+                        Fill: =RGBA(245, 245, 245, 1)
+                        Font: =Font.'Segoe UI'
+                        HoverColor: =RGBA(50, 49, 48, 1)
+                        HoverFill: =RGBA(245, 245, 245, 1)
+                        ItemColor: =RGBA(0, 0, 0, 1)
+                        ItemFill: =RGBA(0, 120, 212, 1)
+                        ItemHoverColor: =RGBA(50, 49, 48, 1)
+                        ItemHoverFill: =RGBA(245, 245, 245, 1)
+                        ItemSpacing: =12
+                        Items: =With({meta:LookUp(colT001Metadata, QueueId = varT001SelectedQueueId)}, If(IsBlank(meta), Parent.Default, LastN(FirstN(colT001AttachmentSource, meta.SourceIndex), 1)))
+                        NoAttachmentsColor: =RGBA(161, 159, 157, 1)
+                        PaddingBottom: =5
+                        PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0)
+                        PaddingRight: =5
+                        PaddingTop: =5
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(0, 120, 212, 1)
+                        Tooltip: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardKey6.Y + DataCardKey6.Height + 5
+                  - ErrorMessage6:
+                      Control: Label
+                      MetadataKey: ErrorMessage
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(168, 0, 0, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(168, 0, 0, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =10
+                        Live: =Live.Assertive
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Text: =Parent.Error
+                        Visible: =Parent.DisplayMode=DisplayMode.Edit
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardValue5.Y + DataCardValue5.Height
+                  - StarVisible6:
+                      Control: Label
+                      MetadataKey: FieldRequired
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =DataCardKey6.Height
+                        PaddingLeft: =0
+                        Text: ="*"
+                        Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                        Width: =30
+                        Wrap: =false
+                        Y: =DataCardKey6.Y
+      - ScreenContainer1:
+          Control: GroupContainer
+          Variant: AutoLayout
+          Properties:
+            Fill: =RGBA(245, 245, 245, 1)
+            Height: =Parent.Height
+            LayoutAlignItems: =LayoutAlignItems.Stretch
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutGap: =16
+            PaddingBottom: =16
+            PaddingLeft: =16
+            PaddingRight: =16
+            PaddingTop: =16
+            Visible: =false
+            Width: =Parent.Width
+          Children:
+            - HeaderContainer1:
+                Control: GroupContainer
+                Variant: AutoLayout
+                Properties:
+                  Fill: =RGBA(255, 255, 255, 1)
+                  FillPortions: =0
+                  Height: =75
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutMinHeight: =16
+                  LayoutMinWidth: =16
+                  PaddingBottom: =8
+                  PaddingLeft: =8
+                  PaddingRight: =8
+                  PaddingTop: =8
+                  RadiusBottomLeft: =8
+                  RadiusBottomRight: =8
+                  RadiusTopLeft: =8
+                  RadiusTopRight: =8
+            - MainContainer1:
+                Control: GroupContainer
+                Variant: AutoLayout
+                Properties:
+                  Fill: =RGBA(255, 255, 255, 1)
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutMinHeight: =16
+                  LayoutMinWidth: =16
+                  PaddingBottom: =8
+                  PaddingLeft: =8
+                  PaddingRight: =8
+                  PaddingTop: =8
+                  RadiusBottomLeft: =8
+                  RadiusBottomRight: =8
+                  RadiusTopLeft: =8
+                  RadiusTopRight: =8
+            - FooterContainer1:
+                Control: GroupContainer
+                Variant: AutoLayout
+                Properties:
+                  Fill: =RGBA(255, 255, 255, 1)
+                  FillPortions: =0
+                  Height: =75
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutMinHeight: =16
+                  LayoutMinWidth: =16
+                  PaddingBottom: =8
+                  PaddingLeft: =8
+                  PaddingRight: =8
+                  PaddingTop: =8
+                  RadiusBottomLeft: =8
+                  RadiusBottomRight: =8
+                  RadiusTopLeft: =8
+                  RadiusTopRight: =8
+      - btnT001Save:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="選択中の件を保存"
+            DisplayMode: =If(varT001Saving || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false) || IsBlank(varT001SelectedQueueId) || LookUp(colT001Metadata, QueueId = varT001SelectedQueueId).SaveStatus = "保存済み" || varT001UnknownQueueId = varT001SelectedQueueId || IsBlank(DataCardValue2.Selected.Value) || IsBlank(DataCardValue3.Selected.Value) || IsBlank(DataCardValue4.Text) || Value(DataCardValue4.Text) < 1 || IsBlank(DateValue1.SelectedDate), DisplayMode.Disabled, DisplayMode.Edit)
+            Height: =44
+            OnSelect: =If(!varT001Saving && !Coalesce(varS01Starting, false) && !Coalesce(varS01StartUnknown, false) && !IsBlank(varT001SelectedQueueId) && !IsBlank(DataCardValue2.Selected.Value) && !IsBlank(DataCardValue3.Selected.Value) && !IsBlank(DataCardValue4.Text) && Value(DataCardValue4.Text) >= 1 && !IsBlank(DateValue1.SelectedDate), Set(varT001UnknownQueueId, Blank()); Set(varT001Saving, true); Set(varT001SavingQueueId, varT001SelectedQueueId); SubmitForm(Form1))
+            Text: ="保存"
+            Width: =160
+            X: =320
+            Y: =Parent.Height - 80
+      - btnT001Stage:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="ログを選ぶ"
+            DisplayMode: =If(Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false) || !IsEmpty(colT001Metadata), DisplayMode.Disabled, DisplayMode.Edit)
+            Height: =44
+            OnSelect: =If(!Coalesce(varS01Starting, false) && !Coalesce(varS01StartUnknown, false) && IsEmpty(colT001Metadata) && !IsEmpty(DataCardValue5.Attachments), Set(varT001Saved, Blank()); Set(varT001UnknownQueueId, Blank()); ClearCollect(colT001AttachmentSource, DataCardValue5.Attachments); Clear(colT001Metadata); ForAll(Sequence(CountRows(colT001AttachmentSource)) As seq, Collect(colT001Metadata, {QueueId:GUID(), SourceIndex:seq.Value, FileName:Last(FirstN(colT001AttachmentSource, seq.Value)).Name, EnvironmentName:"", ServerName:"", RunNumber:Value(Blank()), TargetDate:DateValue(Blank()), SaveStatus:"未保存", EvidenceCaseId:GUID("00000000-0000-0000-0000-000000000000")})); Set(varT001SelectedQueueId, First(colT001Metadata).QueueId); ResetForm(Form1); NewForm(Form1))
+            Text: ="ログを選ぶ"
+            Width: =270
+            X: =25
+            Y: =40
+      - galT001Queue:
+          Control: Gallery
+          Variant: Vertical
+          Properties:
+            AccessibleLabel: ="検証用の入力待ち件一覧"
+            Height: =Parent.Height - 220
+            Items: =colT001Metadata
+            TemplateSize: =56
+            Width: =270
+            X: =25
+            Y: =100
+          Children:
+            - btnT001Select:
+                Control: Button
+                Properties:
+                  AccessibleLabel: =ThisItem.FileName & If(ThisItem.SaveStatus = "保存済み", " 保存済み", If(ThisItem.QueueId = varT001UnknownQueueId, " 保存状況を確認しています", "")) & " を選択"
+                  Appearance: ='ButtonCanvas.Appearance'.Secondary
+                  DisplayMode: =If(varT001Saving || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, DisplayMode.Edit)
+                  Height: =48
+                  OnSelect: =If(!varT001Saving && !Coalesce(varS01Starting, false) && !Coalesce(varS01StartUnknown, false), If(!IsBlank(varT001SelectedQueueId), Patch(colT001Metadata, LookUp(colT001Metadata, QueueId = varT001SelectedQueueId), {EnvironmentName:DataCardValue2.Selected.Value, ServerName:DataCardValue3.Selected.Value, RunNumber:If(IsBlank(DataCardValue4.Text), Blank(), Value(DataCardValue4.Text)), TargetDate:DateValue1.SelectedDate})); Set(varT001SelectedQueueId, ThisItem.QueueId); ResetForm(Form1); NewForm(Form1))
+                  Text: =ThisItem.FileName & If(ThisItem.SaveStatus = "保存済み", " / 保存済み", If(ThisItem.QueueId = varT001UnknownQueueId, " / 保存状況を確認しています", ""))
+                  Width: =250
+                  X: =5
+                  Y: =4
+      - btnT001CancelItem:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="選択中の件を取消"
+            Appearance: ='ButtonCanvas.Appearance'.Secondary
+            DisplayMode: =If(varT001Saving || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false) || IsBlank(varT001SelectedQueueId) || LookUp(colT001Metadata, QueueId = varT001SelectedQueueId).SaveStatus = "保存済み" || varT001UnknownQueueId = varT001SelectedQueueId, DisplayMode.Disabled, DisplayMode.Edit)
+            Height: =44
+            OnSelect: =If(!varT001Saving && !Coalesce(varS01Starting, false) && !Coalesce(varS01StartUnknown, false) && !IsBlank(varT001SelectedQueueId) && LookUp(colT001Metadata, QueueId = varT001SelectedQueueId).SaveStatus <> "保存済み" && varT001UnknownQueueId <> varT001SelectedQueueId, RemoveIf(colT001Metadata, QueueId = varT001SelectedQueueId); If(IsEmpty(colT001Metadata), Clear(colT001AttachmentSource); Set(varT001SelectedQueueId, Blank()), Set(varT001SelectedQueueId, First(colT001Metadata).QueueId)); ResetForm(Form1); NewForm(Form1))
+            Text: ="取消"
+            Width: =270
+            X: =25
+            Y: =Parent.Height - 80
+      - lblT001Receipt:
+          Control: Label
+          Properties:
+            AutoHeight: =true
+            Color: =RGBA(50, 49, 48, 1)
+            Live: =Live.Polite
+            Text: ="受付・対象確認"
+            Width: =Parent.Width - 50
+            X: =25
+            Y: =8
+      - btnS01Progress:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="進捗一覧を開く"
+            Appearance: ='ButtonCanvas.Appearance'.Secondary
+            Height: =40
+            OnSelect: =Navigate(Screen2, ScreenTransition.None)
+            Text: ="進捗一覧"
+            Width: =150
+            X: =Parent.Width - 180
+            Y: =12
+      - btnS01StartFlow:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="処理開始"
+            Appearance: ='ButtonCanvas.Appearance'.Primary
+            DisplayMode: |-
+              =If(
+                varT001Saving ||
+                Coalesce(varS01Starting, false) ||
+                Coalesce(varS01StartUnknown, false) ||
+                !IsBlank(varT001UnknownQueueId) ||
+                IsEmpty(Filter(colT001Metadata, SaveStatus = "保存済み" && !IsBlank(EvidenceCaseId))),
+                DisplayMode.Disabled,
+                DisplayMode.Edit
+              )
+            Height: =44
+            OnSelect: |-
+              =If(
+                !varT001Saving &&
+                !Coalesce(varS01Starting, false) &&
+                !Coalesce(varS01StartUnknown, false) &&
+                IsBlank(varT001UnknownQueueId) &&
+                !IsEmpty(Filter(colT001Metadata, SaveStatus = "保存済み" && !IsBlank(EvidenceCaseId))),
+                Set(varS01Starting, true);
+                Set(varS01StartUnknown, false);
+                Set(varS01FlowStatus, "");
+                Clear(colS01StartResults);
+                Refresh('架空ログ証跡件');
+                Refresh('架空ログ転記先');
+                ClearCollect(colS01StartDestinations, '架空ログ転記先');
+                ForAll(
+                  Distinct(
+                    Filter(colT001Metadata, SaveStatus = "保存済み" && !IsBlank(EvidenceCaseId)),
+                    EvidenceCaseId
+                  ) As startCase,
+                  IfError(
+                    With(
+                      {
+                        caseRow: LookUp(
+                          '架空ログ証跡件',
+                          cr6cb_evidencecaseid = startCase.Value
+                        )
+                      },
+                      If(
+                        IsBlank(caseRow.cr6cb_evidencecaseid),
+                        Collect(colS01StartResults, {EvidenceCaseId: startCase.Value, Outcome: "結果不明"}),
+                        If(
+                          caseRow.cr6cb_processingstatus <> "保存済み",
+                          Collect(colS01StartResults, {EvidenceCaseId: startCase.Value, Outcome: "対象外"}),
+                          If(
+                            CountRows(
+                              Filter(
+                                colS01StartDestinations,
+                                cr6cb_environment = caseRow.cr6cb_environment &&
+                                cr6cb_server = caseRow.cr6cb_server &&
+                                cr6cb_isactive = '有効 (架空ログ転記先)'.有効
+                              )
+                            ) <> 1,
+                            IfError(
+                              Patch(
+                                '架空ログ証跡件',
+                                caseRow,
+                                {cr6cb_failurereason: "有効な転記先が一意に確認できません。"}
+                              );
+                              Collect(colS01StartResults, {EvidenceCaseId: startCase.Value, Outcome: "転記先なし"}),
+                              Collect(colS01StartResults, {EvidenceCaseId: startCase.Value, Outcome: "理由保存失敗"})
+                            ),
+                            IfError(
+                              Patch(
+                                '架空ログ証跡件',
+                                caseRow,
+                                {
+                                  cr6cb_processingstatus: "開始受付済み",
+                                  cr6cb_failurereason: ""
+                                }
+                              );
+                              IfError(
+                                If(
+                                  '架空ログ証跡_件別Excel転記'.Run(Text(startCase.Value)),
+                                  Collect(colS01StartResults, {EvidenceCaseId: startCase.Value, Outcome: "受付済み"}),
+                                  Collect(colS01StartResults, {EvidenceCaseId: startCase.Value, Outcome: "結果不明"})
+                                ),
+                                Collect(colS01StartResults, {EvidenceCaseId: startCase.Value, Outcome: "結果不明"})
+                              ),
+                              Collect(colS01StartResults, {EvidenceCaseId: startCase.Value, Outcome: "結果不明"})
+                            )
+                          )
+                        )
+                      )
+                    ),
+                    Collect(colS01StartResults, {EvidenceCaseId: startCase.Value, Outcome: "結果不明"})
+                  )
+                );
+                Refresh('架空ログ証跡件');
+                Set(varS01StartUnknown, CountIf(colS01StartResults, Outcome = "結果不明") > 0);
+                Set(varS01Starting, false);
+                If(
+                  Coalesce(varS01StartUnknown, false) || CountIf(colS01StartResults, Outcome = "結果不明") > 0,
+                  Set(varS01FlowStatus, "開始状況を確認しています"),
+                  If(
+                    CountIf(colS01StartResults, Outcome = "受付済み") > 0,
+                    Set(varS01FlowStatus, "処理を開始しました");
+                    Navigate(Screen2, ScreenTransition.None),
+                    If(
+                      CountIf(colS01StartResults, Outcome = "転記先なし" || Outcome = "理由保存失敗") > 0,
+                      Set(varS01FlowStatus, If(CountIf(colS01StartResults, Outcome = "理由保存失敗") > 0, "転記先の理由を保存できませんでした", "転記先を確認してください")),
+                      Set(varS01FlowStatus, "保存済みの対象を確認してください")
+                    )
+                  )
+                )
+              )
+            Text: ="処理開始"
+            Width: =160
+            X: =Parent.Width - 190
+            Y: =Parent.Height - 80
+      - lblS01FlowStatus:
+          Control: Label
+          Properties:
+            Color: =RGBA(120, 75, 0, 1)
+            Live: =Live.Polite
+            Text: =If(Coalesce(varS01StartUnknown, false), "開始状況を確認しています", Coalesce(varS01FlowStatus, ""))
+            Width: =Parent.Width - 720
+            X: =500
+            Y: =Parent.Height - 78

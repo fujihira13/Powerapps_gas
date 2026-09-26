@@ -1,0 +1,60 @@
+{
+  "@odata.type": "Microsoft.Dynamics.CRM.EntityMetadata",
+  "SchemaName": "cr6cb_EvidenceDestination",
+  "DisplayName": {
+    "@odata.type": "Microsoft.Dynamics.CRM.Label",
+    "LocalizedLabels": [
+      {
+        "@odata.type": "Microsoft.Dynamics.CRM.LocalizedLabel",
+        "Label": "架空ログ転記先",
+        "LanguageCode": 1033
+      }
+    ]
+  },
+  "DisplayCollectionName": {
+    "@odata.type": "Microsoft.Dynamics.CRM.Label",
+    "LocalizedLabels": [
+      {
+        "@odata.type": "Microsoft.Dynamics.CRM.LocalizedLabel",
+        "Label": "架空ログ転記先",
+        "LanguageCode": 1033
+      }
+    ]
+  },
+  "Description": {
+    "@odata.type": "Microsoft.Dynamics.CRM.Label",
+    "LocalizedLabels": [
+      {
+        "@odata.type": "Microsoft.Dynamics.CRM.LocalizedLabel",
+        "Label": "架空の環境とサーバーに対応する証跡保存先を登録する表",
+        "LanguageCode": 1033
+      }
+    ]
+  },
+  "OwnershipType": "OrganizationOwned",
+  "IsActivity": false,
+  "HasActivities": false,
+  "HasNotes": false,
+  "Attributes": [
+    {
+      "@odata.type": "Microsoft.Dynamics.CRM.StringAttributeMetadata",
+      "AttributeType": "String",
+      "AttributeTypeName": { "Value": "StringType" },
+      "SchemaName": "cr6cb_DestinationLabel",
+      "DisplayName": {
+        "@odata.type": "Microsoft.Dynamics.CRM.Label",
+        "LocalizedLabels": [
+          {
+            "@odata.type": "Microsoft.Dynamics.CRM.LocalizedLabel",
+            "Label": "転記先の表示名",
+            "LanguageCode": 1033
+          }
+        ]
+      },
+      "IsPrimaryName": true,
+      "RequiredLevel": { "Value": "None" },
+      "FormatName": { "Value": "Text" },
+      "MaxLength": 100
+    }
+  ]
+}

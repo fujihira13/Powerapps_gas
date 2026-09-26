@@ -1,0 +1,258 @@
+Screens:
+  Screen4:
+    Properties:
+      Fill: =RGBA(243, 246, 250, 1)
+      LoadingSpinnerColor: =RGBA(0, 96, 160, 1)
+      OnVisible: =Reset(radReviewResult); Reset(txtReviewReason)
+    Children:
+      - lblReviewTitle:
+          Control: Label
+          Properties:
+            Color: =RGBA(25, 54, 92, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Bold
+            Height: =52
+            Size: =28
+            Text: ="レビュー"
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =18
+      - lblReviewIdentity:
+          Control: Label
+          Properties:
+            Color: =RGBA(42, 57, 75, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Height: =42
+            Size: =16
+            Text: =Coalesce(varEvidenceCase.cr6cb_caselabel, "—") & "　" & Coalesce(varEvidenceCase.cr6cb_environment, "—") & " / " & Coalesce(varEvidenceCase.cr6cb_server, "—") & " / 実行回 " & If(IsBlank(varEvidenceCase.cr6cb_runnumber), "—", Text(varEvidenceCase.cr6cb_runnumber, "0")) & " / " & If(IsBlank(varEvidenceCase.cr6cb_targetdate), "—", Text(varEvidenceCase.cr6cb_targetdate, "[$-ja-JP]yyyy-mm-dd"))
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =76
+      - lblReviewAssigneeHeading:
+          Control: Label
+          Properties:
+            Color: =RGBA(25, 54, 92, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Height: =28
+            Size: =18
+            Text: ="担当者の確認"
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =132
+      - lblReviewTransferCheck:
+          Control: Label
+          Properties:
+            Color: =RGBA(42, 57, 75, 1)
+            Font: =Font.'Segoe UI'
+            Height: =28
+            Text: |-
+              ="転記内容の照合: " & Coalesce(varEvidenceCase.cr6cb_transfercheck, "—")
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =166
+      - lblReviewOutcome:
+          Control: Label
+          Properties:
+            Color: =RGBA(42, 57, 75, 1)
+            Font: =Font.'Segoe UI'
+            Height: =28
+            Text: |-
+              ="処理結果の判断: " & Coalesce(varEvidenceCase.cr6cb_outcomejudgment, "—")
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =198
+      - lblReviewComment:
+          Control: Label
+          Properties:
+            AutoHeight: =true
+            Color: =RGBA(42, 57, 75, 1)
+            Font: =Font.'Segoe UI'
+            Height: =28
+            Text: |-
+              ="コメント: " & Coalesce(varEvidenceCase.cr6cb_reviewcomment, "—")
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =230
+      - lblReviewRequestStatus:
+          Control: Label
+          Properties:
+            Color: =RGBA(42, 57, 75, 1)
+            Font: =Font.'Segoe UI'
+            Height: =28
+            Text: |-
+              ="レビュー依頼状態: " & Coalesce(varEvidenceCase.cr6cb_reviewstatus, "—")
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =If(IsBlank(varEvidenceCase.cr6cb_reviewcomment), 262, 284)
+      - lblReviewResultStatus:
+          Control: Label
+          Properties:
+            Color: =RGBA(42, 57, 75, 1)
+            Font: =Font.'Segoe UI'
+            Height: =28
+            Text: |-
+              ="結果: " & If(varEvidenceCase.cr6cb_reviewstatus = "確認済み" || varEvidenceCase.cr6cb_reviewstatus = "差し戻し", varEvidenceCase.cr6cb_reviewstatus, "—")
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =If(IsBlank(varEvidenceCase.cr6cb_reviewcomment), 294, 316)
+      - lblReviewReturnReason:
+          Control: Label
+          Properties:
+            AutoHeight: =true
+            Color: =RGBA(163, 38, 45, 1)
+            Font: =Font.'Segoe UI'
+            Height: =28
+            Text: |-
+              ="差し戻し理由: " & varEvidenceCase.cr6cb_reviewreason
+            Visible: =!IsBlank(varEvidenceCase.cr6cb_reviewreason)
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =If(IsBlank(varEvidenceCase.cr6cb_reviewcomment), 326, 348)
+      - lblReviewRole:
+          Control: Label
+          Properties:
+            Color: =RGBA(42, 57, 75, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Height: =28
+            Text: |-
+              ="実演上の役割: " & varDemoRole
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =If(IsBlank(varEvidenceCase.cr6cb_reviewcomment), 362, 384)
+      - btnReviewSwitchRole:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="レビュアー役に切り替える"
+            Appearance: ='ButtonCanvas.Appearance'.Secondary
+            DisplayMode: =If((varEvidenceCase.cr6cb_reviewstatus = "依頼中" || varEvidenceCase.cr6cb_reviewstatus = "再依頼") && varDemoRole <> "レビュアー役", DisplayMode.Edit, DisplayMode.Disabled)
+            Height: =42
+            OnSelect: =Set(varDemoRole, "レビュアー役")
+            Text: ="レビュアー役に切り替える"
+            Width: =260
+            X: =24
+            Y: =If(IsBlank(varEvidenceCase.cr6cb_reviewcomment), 394, 416)
+      - lblReviewResultHeading:
+          Control: Label
+          Properties:
+            Color: =RGBA(25, 54, 92, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Height: =28
+            Size: =16
+            Text: ="レビュー結果"
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =If(IsBlank(varEvidenceCase.cr6cb_reviewcomment), 444, 466)
+      - radReviewResult:
+          Control: ModernRadio
+          Properties:
+            AccessibleLabel: ="レビュー結果"
+            Default: =Blank()
+            DisplayMode: =If(varDemoRole = "レビュアー役" && (varEvidenceCase.cr6cb_reviewstatus = "依頼中" || varEvidenceCase.cr6cb_reviewstatus = "再依頼"), DisplayMode.Edit, DisplayMode.Disabled)
+            Height: =44
+            Items: =["確認済み", "差し戻し"]
+            Layout: =OptionLayout.Horizontal
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =If(IsBlank(varEvidenceCase.cr6cb_reviewcomment), 472, 494)
+      - lblReviewReasonHeading:
+          Control: Label
+          Properties:
+            Color: =RGBA(25, 54, 92, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Height: =26
+            Size: =16
+            Text: ="差し戻し理由"
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =If(IsBlank(varEvidenceCase.cr6cb_reviewcomment), 518, 540)
+      - txtReviewReason:
+          Control: ModernTextInput
+          Properties:
+            AccessibleLabel: ="差し戻し理由"
+            Default: =""
+            DisplayMode: =If(varDemoRole = "レビュアー役" && (varEvidenceCase.cr6cb_reviewstatus = "依頼中" || varEvidenceCase.cr6cb_reviewstatus = "再依頼"), DisplayMode.Edit, DisplayMode.Disabled)
+            Height: =62
+            Required: =radReviewResult.Selected.Value = "差し戻し"
+            Type: =TextInputType.Multiline
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =If(IsBlank(varEvidenceCase.cr6cb_reviewcomment), 546, 568)
+      - btnReviewRecord:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="レビュー結果を記録"
+            Appearance: ='ButtonCanvas.Appearance'.Primary
+            DisplayMode: =If(varDemoRole = "レビュアー役" && (varEvidenceCase.cr6cb_reviewstatus = "依頼中" || varEvidenceCase.cr6cb_reviewstatus = "再依頼") && !IsBlank(radReviewResult.Selected.Value) && (radReviewResult.Selected.Value = "確認済み" || !IsBlank(Trim(txtReviewReason.Text))), DisplayMode.Edit, DisplayMode.Disabled)
+            Height: =42
+            OnSelect: |-
+              =If(
+                varDemoRole = "レビュアー役" &&
+                (varEvidenceCase.cr6cb_reviewstatus = "依頼中" || varEvidenceCase.cr6cb_reviewstatus = "再依頼") &&
+                !IsBlank(radReviewResult.Selected.Value) &&
+                (radReviewResult.Selected.Value = "確認済み" || !IsBlank(Trim(txtReviewReason.Text))),
+                Refresh('架空ログ証跡件');
+                Set(
+                  varReviewCurrentCase,
+                  LookUp(
+                    '架空ログ証跡件',
+                    cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid
+                  )
+                );
+                If(
+                  !IsBlank(varReviewCurrentCase.cr6cb_evidencecaseid) &&
+                  varReviewCurrentCase.versionnumber = varEvidenceCase.versionnumber &&
+                  (varReviewCurrentCase.cr6cb_reviewstatus = "依頼中" || varReviewCurrentCase.cr6cb_reviewstatus = "再依頼"),
+                  With(
+                    {
+                      savedCase: IfError(
+                        Patch(
+                          '架空ログ証跡件',
+                          varReviewCurrentCase,
+                          {
+                            cr6cb_reviewstatus: radReviewResult.Selected.Value,
+                            cr6cb_reviewreason: If(radReviewResult.Selected.Value = "差し戻し", txtReviewReason.Text, Blank())
+                          }
+                        ),
+                        Blank()
+                      )
+                    },
+                    If(
+                      !IsBlank(savedCase.cr6cb_evidencecaseid),
+                      Set(varEvidenceCase, savedCase);
+                      Set(varDemoRole, "担当者役");
+                      Navigate(Screen2, ScreenTransition.None)
+                    )
+                  )
+                )
+              )
+            Text: ="レビュー結果を記録"
+            Width: =200
+            X: =24
+            Y: =710
+      - btnReviewOpenCase:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="件の内容を確認"
+            Appearance: ='ButtonCanvas.Appearance'.Secondary
+            Height: =42
+            OnSelect: =Navigate(Screen3, ScreenTransition.None)
+            Text: ="件の内容を確認"
+            Width: =180
+            X: =240
+            Y: =710
+      - btnReviewBack:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="一覧に戻る"
+            Appearance: ='ButtonCanvas.Appearance'.Secondary
+            Height: =42
+            OnSelect: =Set(varDemoRole, "担当者役"); Navigate(Screen2, ScreenTransition.None)
+            Text: ="一覧に戻る"
+            Width: =160
+            X: =436
+            Y: =710

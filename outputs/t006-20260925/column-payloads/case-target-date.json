@@ -1,0 +1,24 @@
+{
+  "@odata.type": "Microsoft.Dynamics.CRM.DateTimeAttributeMetadata",
+  "AttributeType": "DateTime",
+  "AttributeTypeName": {
+    "Value": "DateTimeType"
+  },
+  "SchemaName": "cr6cb_TargetDate",
+  "DisplayName": {
+    "@odata.type": "Microsoft.Dynamics.CRM.Label",
+    "LocalizedLabels": [
+      {
+        "Label": "対象処理日",
+        "LanguageCode": 1041
+      }
+    ]
+  },
+  "RequiredLevel": {
+    "Value": "ApplicationRequired"
+  },
+  "Format": "DateOnly",
+  "DateTimeBehavior": {
+    "Value": "DateOnly"
+  }
+}

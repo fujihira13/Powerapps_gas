@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>RequiredFields.Plugin.Tests</AssemblyName>
+    <RootNamespace>PowerappsGas.DataversePlugins.Tests</RootNamespace>
+    <LangVersion>7.3</LangVersion>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <DataverseSdkAssemblyPath Condition="'$(DataverseSdkAssemblyPath)' == ''">$(DATAVERSE_SDK_ASSEMBLY_PATH)</DataverseSdkAssemblyPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RequiredFields.Plugin\RequiredFields.Plugin.csproj" />
+    <Reference Include="Microsoft.Xrm.Sdk">
+      <HintPath>$(DataverseSdkAssemblyPath)</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="RequireDataverseSdkAssembly" BeforeTargets="ResolveReferences" Condition="'$(DataverseSdkAssemblyPath)' == '' Or !Exists('$(DataverseSdkAssemblyPath)')">
+    <Error Text="Set DataverseSdkAssemblyPath to the local Microsoft.Xrm.Sdk.dll supplied with PAC CLI. No package download is performed by this project." />
+  </Target>
+</Project>

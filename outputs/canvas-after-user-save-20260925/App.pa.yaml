@@ -1,0 +1,5 @@
+App:
+  Properties:
+    OnStart: =Set(varDemoRole, "担当者役")
+    StartScreen: =If(!IsBlank(LookUp('架空ログ証跡件', cr6cb_processingstatus = "受付済み" || cr6cb_processingstatus = "処理中" || cr6cb_processingstatus = "停止" || cr6cb_processingstatus = "結果不明" || cr6cb_reviewstatus = "依頼中")), Screen2, Screen1)
+    Theme: =PowerAppsTheme

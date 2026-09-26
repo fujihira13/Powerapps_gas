@@ -1,0 +1,48 @@
+{
+  "@odata.type": "Microsoft.Dynamics.CRM.BooleanAttributeMetadata",
+  "AttributeType": "Boolean",
+  "AttributeTypeName": {
+    "Value": "BooleanType"
+  },
+  "SchemaName": "cr6cb_IsActive",
+  "DisplayName": {
+    "@odata.type": "Microsoft.Dynamics.CRM.Label",
+    "LocalizedLabels": [
+      {
+        "Label": "有効",
+        "LanguageCode": 1041
+      }
+    ]
+  },
+  "RequiredLevel": {
+    "Value": "None"
+  },
+  "DefaultValue": true,
+  "OptionSet": {
+    "TrueOption": {
+      "Value": 1,
+      "Label": {
+        "@odata.type": "Microsoft.Dynamics.CRM.Label",
+        "LocalizedLabels": [
+          {
+            "Label": "有効",
+            "LanguageCode": 1041
+          }
+        ]
+      }
+    },
+    "FalseOption": {
+      "Value": 0,
+      "Label": {
+        "@odata.type": "Microsoft.Dynamics.CRM.Label",
+        "LocalizedLabels": [
+          {
+            "Label": "無効",
+            "LanguageCode": 1041
+          }
+        ]
+      }
+    },
+    "OptionSetType": "Boolean"
+  }
+}

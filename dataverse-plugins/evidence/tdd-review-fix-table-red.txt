@@ -1,0 +1,24 @@
+TDD red run for the table-name finding — 2026-09-25 (Asia/Tokyo)
+
+Command: .\dataverse-plugins\run-local-tests.ps1
+SDK: Microsoft.Xrm.Sdk.dll supplied by local PAC CLI 2.12.2
+Build target: .NET Framework 4.8; external package sources cleared in NuGet.Config
+Build: succeeded, 0 warnings, 0 errors
+
+PASS  Create rejects each missing business field
+PASS  Create rejects null for each business field
+PASS  Create rejects empty and whitespace environment/server
+PASS  Create accepts four valid business values
+FAIL  Create rejects zero and negative run numbers — Expected InvalidPluginExecutionException for run number 0.
+PASS  Update rejects clearing each business field
+PASS  Update rejects empty and whitespace environment/server
+PASS  Update merges changed Target values with unchanged PreImage values
+PASS  Update accepts all four valid values in Target
+FAIL  Update rejects zero and negative run numbers — Expected InvalidPluginExecutionException for run number 0.
+PASS  Update accepts an unrelated-field change when PreImage has valid business fields
+PASS  Update rejects an omitted business field when its PreImage is absent
+FAIL  A future dedicated test table is not blocked by an existing-table name constant — This plug-in is intended for the cr6cb_evidencecase table.
+PASS  Identical complete business tuples pass local validation; duplicate rejection remains the alternate key's responsibility
+Local results: 11 passed, 3 failed.
+
+The future-table case reproduced the hard-coded entity-name guard. The grouped run-number tests failed first on zero; separate zero and -1 red evidence is in `tdd-review-fix-red.txt`.

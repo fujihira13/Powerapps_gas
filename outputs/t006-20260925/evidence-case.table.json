@@ -1,0 +1,60 @@
+{
+  "@odata.type": "Microsoft.Dynamics.CRM.EntityMetadata",
+  "SchemaName": "cr6cb_EvidenceCase",
+  "DisplayName": {
+    "@odata.type": "Microsoft.Dynamics.CRM.Label",
+    "LocalizedLabels": [
+      {
+        "@odata.type": "Microsoft.Dynamics.CRM.LocalizedLabel",
+        "Label": "架空ログ証跡件",
+        "LanguageCode": 1033
+      }
+    ]
+  },
+  "DisplayCollectionName": {
+    "@odata.type": "Microsoft.Dynamics.CRM.Label",
+    "LocalizedLabels": [
+      {
+        "@odata.type": "Microsoft.Dynamics.CRM.LocalizedLabel",
+        "Label": "架空ログ証跡件",
+        "LanguageCode": 1033
+      }
+    ]
+  },
+  "Description": {
+    "@odata.type": "Microsoft.Dynamics.CRM.Label",
+    "LocalizedLabels": [
+      {
+        "@odata.type": "Microsoft.Dynamics.CRM.LocalizedLabel",
+        "Label": "実演用の架空ログ1件を追跡するための表",
+        "LanguageCode": 1033
+      }
+    ]
+  },
+  "OwnershipType": "UserOwned",
+  "IsActivity": false,
+  "HasActivities": false,
+  "HasNotes": true,
+  "Attributes": [
+    {
+      "@odata.type": "Microsoft.Dynamics.CRM.StringAttributeMetadata",
+      "AttributeType": "String",
+      "AttributeTypeName": { "Value": "StringType" },
+      "SchemaName": "cr6cb_CaseLabel",
+      "DisplayName": {
+        "@odata.type": "Microsoft.Dynamics.CRM.Label",
+        "LocalizedLabels": [
+          {
+            "@odata.type": "Microsoft.Dynamics.CRM.LocalizedLabel",
+            "Label": "件の表示名",
+            "LanguageCode": 1033
+          }
+        ]
+      },
+      "IsPrimaryName": true,
+      "RequiredLevel": { "Value": "None" },
+      "FormatName": { "Value": "Text" },
+      "MaxLength": 100
+    }
+  ]
+}

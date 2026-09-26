@@ -1,0 +1,23 @@
+{
+  "@odata.type": "Microsoft.Dynamics.CRM.IntegerAttributeMetadata",
+  "AttributeType": "Integer",
+  "AttributeTypeName": {
+    "Value": "IntegerType"
+  },
+  "SchemaName": "cr6cb_RunNumber",
+  "DisplayName": {
+    "@odata.type": "Microsoft.Dynamics.CRM.Label",
+    "LocalizedLabels": [
+      {
+        "Label": "実行回",
+        "LanguageCode": 1041
+      }
+    ]
+  },
+  "RequiredLevel": {
+    "Value": "ApplicationRequired"
+  },
+  "Format": "None",
+  "MinValue": 1,
+  "MaxValue": 2147483647
+}

@@ -1,0 +1,22 @@
+TDD red run — 2026-09-25 (Asia/Tokyo)
+
+Command: .\dataverse-plugins\run-local-tests.ps1
+SDK: Microsoft.Xrm.Sdk.dll supplied by local PAC CLI 2.12.2
+Build target: .NET Framework 4.8; external package sources cleared in NuGet.Config
+Build: succeeded, 0 warnings, 0 errors
+Expected initial behavioral failure: yes; the IPlugin skeleton did not yet validate fields.
+
+FAIL  Create rejects each missing business field — Expected InvalidPluginExecutionException for missing cr6cb_environment.
+FAIL  Create rejects null for each business field — Expected InvalidPluginExecutionException for null cr6cb_environment.
+FAIL  Create rejects empty and whitespace environment/server — Expected InvalidPluginExecutionException for blank cr6cb_environment.
+PASS  Create accepts four valid business values
+FAIL  Update rejects clearing each business field — Expected InvalidPluginExecutionException for cleared cr6cb_environment.
+FAIL  Update rejects empty and whitespace environment/server — Expected InvalidPluginExecutionException for blank cr6cb_environment.
+PASS  Update merges changed Target values with unchanged PreImage values
+PASS  Update accepts all four valid values in Target
+PASS  Update accepts an unrelated-field change when PreImage has valid business fields
+FAIL  Update rejects an omitted business field when its PreImage is absent — Expected InvalidPluginExecutionException for missing server in PreImage.
+PASS  Identical complete business tuples pass local validation; duplicate rejection remains the alternate key's responsibility
+Local results: 5 passed, 6 failed.
+
+The duplicate tuple case is characterization only. It does not test Dataverse alternate-key enforcement.

@@ -1,0 +1,28 @@
+TDD green run for review fixes — 2026-09-25 (Asia/Tokyo)
+
+Command: .\dataverse-plugins\run-local-tests.ps1
+SDK: Microsoft.Xrm.Sdk.dll supplied by local PAC CLI 2.12.2
+Build target: .NET Framework 4.8; external package sources cleared in NuGet.Config
+Build: succeeded, 0 warnings, 0 errors
+The test context uses synthetic table names. The 0 and -1 run-number cases are independent tests for both Create and Update.
+
+PASS  Create rejects each missing business field
+PASS  Create rejects null for each business field
+PASS  Create rejects empty and whitespace environment/server
+PASS  Create accepts four valid business values
+PASS  Create rejects run number zero
+PASS  Create rejects negative run number
+PASS  Update rejects clearing each business field
+PASS  Update rejects empty and whitespace environment/server
+PASS  Update merges changed Target values with unchanged PreImage values
+PASS  Update accepts all four valid values in Target
+PASS  Update rejects run number zero
+PASS  Update rejects negative run number
+PASS  Update accepts an unrelated-field change when PreImage has valid business fields
+PASS  Update rejects an omitted business field when its PreImage is absent
+PASS  A future dedicated test table is not blocked by an existing-table name constant
+PASS  Identical complete business tuples pass local validation; duplicate rejection remains the alternate key's responsibility
+Local results: 16 passed, 0 failed.
+LIMIT: duplicate-key rejection and alternate-key Active state require Dataverse verification; this local run does not establish either.
+
+This is local SDK-backed behavior verification with a fake execution context. It is not a Dataverse registration or runtime result.

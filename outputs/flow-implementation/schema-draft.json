@@ -1,0 +1,120 @@
+{
+  "status": "local draft; no Dataverse changes made",
+  "source": {
+    "confirmed_candidate_tables": "T006 local preparation records and docs/TASKS.md",
+    "warning": "The two T006 tables are candidates, not an adopted production schema. This file is a minimal additive proposal."
+  },
+  "case_table": {
+    "schema_name": "cr6cb_EvidenceCase",
+    "logical_name": "cr6cb_evidencecase",
+    "document_notes_enabled": true,
+    "existing_columns": [
+      {"logical_name": "cr6cb_caselabel", "type": "Text", "max_length": 100, "role": "primary name"},
+      {"logical_name": "cr6cb_environment", "type": "Text", "max_length": 100, "role": "four-field business key"},
+      {"logical_name": "cr6cb_server", "type": "Text", "max_length": 100, "role": "four-field business key"},
+      {"logical_name": "cr6cb_runnumber", "type": "Whole Number", "minimum": 1, "role": "four-field business key"},
+      {"logical_name": "cr6cb_targetdate", "type": "Date Only", "role": "four-field business key"}
+    ],
+    "additive_columns": [
+      {
+        "logical_name": "cr6cb_processingstatus",
+        "display_name": "処理状態",
+        "type": "Text",
+        "max_length": 32,
+        "ui_values": ["保存済み", "取消", "開始受付済み", "処理中", "停止", "結果不明", "転記済み"],
+        "owner": "Canvas and transfer flow",
+        "purpose": "Persist the case stage and restore it in the app after restart."
+      },
+      {
+        "logical_name": "cr6cb_excelcheckstatus",
+        "display_name": "Excel反映確認",
+        "type": "Text",
+        "max_length": 32,
+        "ui_values": ["未確認", "全文一致", "不一致", "読出不能"],
+        "owner": "Transfer flow",
+        "purpose": "Keep write acknowledgement separate from verified workbook contents."
+      },
+      {
+        "logical_name": "cr6cb_failurereason",
+        "display_name": "停止理由",
+        "type": "Multiline Text",
+        "owner": "Transfer flow"
+      },
+      {
+        "logical_name": "cr6cb_excelurl",
+        "display_name": "証跡Excel",
+        "type": "Text",
+        "max_length": 2000,
+        "owner": "Transfer flow",
+        "purpose": "Let the app open the per-case workbook."
+      },
+      {
+        "logical_name": "cr6cb_transfercheck",
+        "display_name": "転記照合",
+        "type": "Text",
+        "max_length": 16,
+        "ui_values": ["一致", "不一致", "確認保留"],
+        "owner": "Canvas; person-entered"
+      },
+      {
+        "logical_name": "cr6cb_outcomejudgment",
+        "display_name": "処理結果判断",
+        "type": "Text",
+        "max_length": 16,
+        "ui_values": ["正常", "異常", "判断保留"],
+        "owner": "Canvas; person-entered"
+      },
+      {
+        "logical_name": "cr6cb_reviewcomment",
+        "display_name": "担当者コメント",
+        "type": "Multiline Text",
+        "owner": "Canvas; person-entered"
+      },
+      {
+        "logical_name": "cr6cb_reviewstatus",
+        "display_name": "レビュー状態",
+        "type": "Text",
+        "max_length": 16,
+        "ui_values": ["未依頼", "依頼中", "確認済み", "差し戻し"],
+        "owner": "Canvas; person-entered"
+      },
+      {
+        "logical_name": "cr6cb_reviewreason",
+        "display_name": "差し戻し理由",
+        "type": "Multiline Text",
+        "owner": "Canvas; person-entered"
+      }
+    ],
+    "attachment_source": {
+      "table": "annotation",
+      "relationship": "note attached to the case row",
+      "selection_rule_for_first_pass": "Require exactly one attached document note. Stop if zero or multiple are found.",
+      "deferred": "A separate active-note ID is needed if log replacement leaves multiple attached files."
+    }
+  },
+  "destination_table": {
+    "schema_name": "cr6cb_EvidenceDestination",
+    "logical_name": "cr6cb_evidencedestination",
+    "columns_already_prepared": [
+      "cr6cb_destinationlabel",
+      "cr6cb_environment",
+      "cr6cb_server",
+      "cr6cb_driveid",
+      "cr6cb_folderid",
+      "cr6cb_isactive"
+    ],
+    "flow_destination": {
+      "mode": "single portfolio demonstration folder constant",
+      "relative_folder_path": "Documents/架空ログ証跡アプリ完成版検証-T006-20260925",
+      "metadata_read": "2026-09-25; folder-only metadata read through the approved SharePoint tool",
+      "connector_path_acceptance": "not yet tested; verify in the first cloud copy"
+    }
+  },
+  "deferred_columns": [
+    {"logical_name": "cr6cb_activeannotationid", "type": "Text or Unique Identifier", "reason": "Needed only when replacement retains multiple file notes; first pass stops unless exactly one note exists."},
+    {"logical_name": "cr6cb_fixeddestinationfolderid", "type": "Text", "reason": "Needed if mappings can change between start and retry; one fixed demo folder is used in the first pass."},
+    {"logical_name": "cr6cb_attemptid", "type": "Text", "reason": "Needed to distinguish concurrent or delayed retry attempts; first pass has no automatic retry."},
+    {"logical_name": "cr6cb_attemptnumber", "type": "Whole Number", "reason": "Useful for retry history but not required for the initial successful path."}
+  ],
+  "implementation_limit": "Text values are restricted by Canvas controls only. Direct API value validation and all-write-path required-field enforcement are out of this first-pass scope."
+}
