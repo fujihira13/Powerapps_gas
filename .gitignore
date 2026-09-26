@@ -42,3 +42,8 @@ outputs/canvas-c08-id-audit-stage-20260926/
 
 # Duplicate local readback of the C08 saved candidate; final source is tracked separately
 outputs/canvas-c08-post-save-readback-20260926/
+
+# Local readbacks for the committed portfolio display fix; no source changes
+outputs/canvas-portfolio-precompile-live-20260926/
+outputs/canvas-portfolio-postcompile-readback-20260926/
+outputs/canvas-portfolio-postsave-readback-20260926/
