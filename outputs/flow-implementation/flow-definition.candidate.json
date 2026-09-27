@@ -98,7 +98,7 @@
             "parameters": {
               "entityName": "cr6cb_evidencecases",
               "recordId": "@outputs('Compose_CaseId')",
-              "$select": "cr6cb_evidencecaseid,cr6cb_caselabel,cr6cb_environment,cr6cb_server,cr6cb_runnumber,cr6cb_targetdate,cr6cb_processingstatus"
+              "$select": "cr6cb_evidencecaseid,cr6cb_caselabel,cr6cb_environment,cr6cb_server,cr6cb_targetdate,cr6cb_processingstatus,createdon"
             },
             "authentication": "@parameters('$authentication')",
             "retryPolicy": {
@@ -172,6 +172,34 @@
                   "type": "Compose",
                   "inputs": "@base64ToString(first(body('List_attached_notes')?['value'])?['documentbody'])"
                 },
+                "Update_case_stop_log_unreadable": {
+                  "runAfter": {
+                    "Compose_LogText": [
+                      "Failed",
+                      "TimedOut"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "e641967c-61be-5ea4-b358-6e853a259394"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "UpdateOnlyRecord"
+                    },
+                    "parameters": {
+                      "entityName": "cr6cb_evidencecases",
+                      "recordId": "@outputs('Compose_CaseId')",
+                      "item": "@addProperty(addProperty(json('{}'),'cr6cb_processingstatus','停止'),'cr6cb_failurereason','添付ログ本文を読み取れませんでした。本文データが欠落または不正です。')"
+                    },
+                    "authentication": "@parameters('$authentication')",
+                    "retryPolicy": {
+                      "type": "none"
+                    }
+                  }
+                },
                 "Compose_LogFileName": {
                   "runAfter": {
                     "Compose_LogText": [
@@ -196,9 +224,21 @@
                   "type": "Compose",
                   "inputs": "@split(replace(outputs('Compose_LogText'),decodeUriComponent('%0D'),''),decodeUriComponent('%0A'))"
                 },
-                "Compose_IsValidLog": {
+                "Compose_LogValidationReason": {
                   "runAfter": {
                     "Compose_LogLines": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "operationMetadataId": "ec25cd02-5482-53b0-a197-bafdc0a512c7"
+                  },
+                  "type": "Compose",
+                  "inputs": "@if(greater(length(outputs('Compose_LogText')),30000),'ログ本文が処理上限の30,000文字を超えています。',if(empty(outputs('Compose_LogFileName')),'ログのファイル名を読み取れません。',if(not(startsWith(string(coalesce(outputs('Compose_LogLines')?[0],'')),'処理日: ')),'ログの冒頭に処理日行（処理日: YYYY-MM-DD）がありません。',if(not(equals(length(string(coalesce(outputs('Compose_LogLines')?[0],''))),15)),'ログの処理日がYYYY-MM-DD形式ではありません。',if(not(equals(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),9,1),'-')),'ログの処理日がYYYY-MM-DD形式ではありません。',if(not(equals(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),12,1),'-')),'ログの処理日がYYYY-MM-DD形式ではありません。',if(or(not(contains('0123456789',substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),5,1))),not(contains('0123456789',substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),6,1))),not(contains('0123456789',substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),7,1))),not(contains('0123456789',substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),8,1))),not(contains('0123456789',substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),10,1))),not(contains('0123456789',substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),11,1))),not(contains('0123456789',substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),13,1))),not(contains('0123456789',substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),14,1)))),'ログの処理日がYYYY-MM-DD形式ではありません。',if(not(and(greaterOrEquals(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),5,4)),1),lessOrEquals(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),5,4)),9999),greaterOrEquals(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),10,2)),1),lessOrEquals(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),10,2)),12),greaterOrEquals(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),13,2)),1),lessOrEquals(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),13,2)),if(or(equals(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),10,2)),1),equals(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),10,2)),3),equals(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),10,2)),5),equals(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),10,2)),7),equals(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),10,2)),8),equals(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),10,2)),10),equals(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),10,2)),12)),31,if(equals(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),10,2)),2),if(or(equals(mod(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),5,4)),400),0),and(equals(mod(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),5,4)),4),0),not(equals(mod(int(substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),5,4)),100),0)))),29,28),30))))),'ログの処理日は暦上存在しない日付です。',if(not(equals(string(coalesce(outputs('Compose_LogLines')?[0],'')),concat('処理日: ',formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd')))),concat('本文日付（',substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),5,10),'）と対象処理日（',formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd'),'）が一致しません。'),if(not(startsWith(string(coalesce(outputs('Compose_LogLines')?[1],'')),'環境: ')),'ログに環境の識別情報がありません。',if(not(equals(string(coalesce(outputs('Compose_LogLines')?[1],'')),concat('環境: ',outputs('Get_case')?['body/cr6cb_environment']))),'ログの環境が件の環境と一致しません。',if(not(startsWith(string(coalesce(outputs('Compose_LogLines')?[2],'')),'サーバー: ')),'ログにサーバーの識別情報がありません。',if(not(equals(string(coalesce(outputs('Compose_LogLines')?[2],'')),concat('サーバー: ',outputs('Get_case')?['body/cr6cb_server']))),'ログのサーバーが件のサーバーと一致しません。','')))))))))))))"
+                },
+                "Compose_IsValidLog": {
+                  "runAfter": {
+                    "Compose_LogValidationReason": [
                       "Succeeded"
                     ]
                   },
@@ -206,7 +246,7 @@
                     "operationMetadataId": "69931e2f-fef5-5370-a785-d6a1537f1d99"
                   },
                   "type": "Compose",
-                  "inputs": "@and(greaterOrEquals(length(outputs('Compose_LogLines')),4),lessOrEquals(length(outputs('Compose_LogText')),30000),not(empty(outputs('Compose_LogFileName'))),equals(outputs('Compose_LogLines')?[0],concat('処理日: ',formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd'))),equals(outputs('Compose_LogLines')?[1],concat('環境: ',outputs('Get_case')?['body/cr6cb_environment'])),equals(outputs('Compose_LogLines')?[2],concat('サーバー: ',outputs('Get_case')?['body/cr6cb_server'])),equals(outputs('Compose_LogLines')?[3],concat('実行回: ',string(outputs('Get_case')?['body/cr6cb_runnumber']))))"
+                  "inputs": "@equals(outputs('Compose_LogValidationReason'),'')"
                 },
                 "Condition_Log_Matches": {
                   "runAfter": {
@@ -333,7 +373,7 @@
                               "operationId": "CopyDriveFileByPath"
                             },
                             "parameters": {
-                              "source": "/架空ログ証跡アプリ完成版検証-T006-20260925/evidence-template.xlsx",
+                              "source": "/架空ログ証跡アプリ完成版検証-T006-20260925/evidence-template-received-at-jst.xlsx",
                               "destination": "@outputs('Compose_DestinationPath')",
                               "overwrite": false
                             },
@@ -390,7 +430,7 @@
                                   "table": "Evidence",
                                   "idColumn": "CaseId",
                                   "id": "__TEMPLATE__",
-                                  "item": "@addProperty(addProperty(addProperty(addProperty(addProperty(addProperty(addProperty(addProperty(addProperty(json('{}'),'CaseId',outputs('Compose_CaseId')),'LogFileName',outputs('Compose_LogFileName')),'Environment',outputs('Get_case')?['body/cr6cb_environment']),'Server',outputs('Get_case')?['body/cr6cb_server']),'RunNumber',outputs('Get_case')?['body/cr6cb_runnumber']),'TargetDate',formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd')),'ChunkIndex',1),'ChunkCount',1),'LogTextPart',outputs('Compose_LogText'))",
+                                  "item": "@addProperty(addProperty(addProperty(addProperty(addProperty(addProperty(addProperty(addProperty(addProperty(json('{}'),'CaseId',outputs('Compose_CaseId')),'LogFileName',outputs('Compose_LogFileName')),'Environment',outputs('Get_case')?['body/cr6cb_environment']),'Server',outputs('Get_case')?['body/cr6cb_server']),'ReceivedAtJst',convertTimeZone(outputs('Get_case')?['body/createdon'],'UTC','Tokyo Standard Time','yyyy-MM-dd HH:mm:ss')),'TargetDate',formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd')),'ChunkIndex',1),'ChunkCount',1),'LogTextPart',outputs('Compose_LogText'))",
                                   "dateTimeFormat": "ISO 8601"
                                 },
                                 "authentication": "@parameters('$authentication')",
@@ -439,7 +479,7 @@
                                   "table": "Evidence",
                                   "$filter": "@concat('CaseId eq ''',outputs('Compose_CaseId'),'''')",
                                   "$top": 2,
-                                  "$select": "CaseId,LogFileName,Environment,Server,RunNumber,TargetDate,ChunkIndex,ChunkCount,LogTextPart",
+                                  "$select": "CaseId,LogFileName,Environment,Server,ReceivedAtJst,TargetDate,ChunkIndex,ChunkCount,LogTextPart",
                                   "dateTimeFormat": "ISO 8601"
                                 },
                                 "authentication": "@parameters('$authentication')",
@@ -501,7 +541,7 @@
                                       "table": "Evidence",
                                       "$filter": "@concat('CaseId eq ''',outputs('Compose_CaseId'),'''')",
                                       "$top": 3,
-                                      "$select": "CaseId,LogFileName,Environment,Server,RunNumber,TargetDate,ChunkIndex,ChunkCount,LogTextPart",
+                                      "$select": "CaseId,LogFileName,Environment,Server,ReceivedAtJst,TargetDate,ChunkIndex,ChunkCount,LogTextPart",
                                       "dateTimeFormat": "ISO 8601"
                                     },
                                     "authentication": "@parameters('$authentication')",
@@ -522,7 +562,7 @@
                                   "type": "If",
                                   "expression": {
                                     "equals": [
-                                      "@and(equals(length(body('Read_back_evidence_retry')?['value']),1),equals(first(body('Read_back_evidence_retry')?['value'])?['CaseId'],outputs('Compose_CaseId')),equals(first(body('Read_back_evidence_retry')?['value'])?['LogFileName'],outputs('Compose_LogFileName')),equals(first(body('Read_back_evidence_retry')?['value'])?['Environment'],outputs('Get_case')?['body/cr6cb_environment']),equals(first(body('Read_back_evidence_retry')?['value'])?['Server'],outputs('Get_case')?['body/cr6cb_server']),equals(string(first(body('Read_back_evidence_retry')?['value'])?['RunNumber']),string(outputs('Get_case')?['body/cr6cb_runnumber'])),startsWith(string(first(body('Read_back_evidence_retry')?['value'])?['TargetDate']),formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd')),equals(string(first(body('Read_back_evidence_retry')?['value'])?['ChunkIndex']),'1'),equals(string(first(body('Read_back_evidence_retry')?['value'])?['ChunkCount']),'1'),equals(first(body('Read_back_evidence_retry')?['value'])?['LogTextPart'],outputs('Compose_LogText')))",
+                                      "@and(equals(length(body('Read_back_evidence_retry')?['value']),1),equals(first(body('Read_back_evidence_retry')?['value'])?['CaseId'],outputs('Compose_CaseId')),equals(first(body('Read_back_evidence_retry')?['value'])?['LogFileName'],outputs('Compose_LogFileName')),equals(first(body('Read_back_evidence_retry')?['value'])?['Environment'],outputs('Get_case')?['body/cr6cb_environment']),equals(first(body('Read_back_evidence_retry')?['value'])?['Server'],outputs('Get_case')?['body/cr6cb_server']),equals(first(body('Read_back_evidence_retry')?['value'])?['ReceivedAtJst'],convertTimeZone(outputs('Get_case')?['body/createdon'],'UTC','Tokyo Standard Time','yyyy-MM-dd HH:mm:ss')),startsWith(string(first(body('Read_back_evidence_retry')?['value'])?['TargetDate']),formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd')),equals(string(first(body('Read_back_evidence_retry')?['value'])?['ChunkIndex']),'1'),equals(string(first(body('Read_back_evidence_retry')?['value'])?['ChunkCount']),'1'),equals(first(body('Read_back_evidence_retry')?['value'])?['LogTextPart'],outputs('Compose_LogText')))",
                                       true
                                     ]
                                   },
@@ -590,7 +630,7 @@
                                     "type": "If",
                                     "expression": {
                                       "equals": [
-                                        "@and(equals(length(body('Read_back_evidence')?['value']),1),equals(first(body('Read_back_evidence')?['value'])?['CaseId'],outputs('Compose_CaseId')),equals(first(body('Read_back_evidence')?['value'])?['LogFileName'],outputs('Compose_LogFileName')),equals(first(body('Read_back_evidence')?['value'])?['Environment'],outputs('Get_case')?['body/cr6cb_environment']),equals(first(body('Read_back_evidence')?['value'])?['Server'],outputs('Get_case')?['body/cr6cb_server']),equals(string(first(body('Read_back_evidence')?['value'])?['RunNumber']),string(outputs('Get_case')?['body/cr6cb_runnumber'])),startsWith(string(first(body('Read_back_evidence')?['value'])?['TargetDate']),formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd')),equals(string(first(body('Read_back_evidence')?['value'])?['ChunkIndex']),'1'),equals(string(first(body('Read_back_evidence')?['value'])?['ChunkCount']),'1'),equals(first(body('Read_back_evidence')?['value'])?['LogTextPart'],outputs('Compose_LogText')))",
+                                        "@and(equals(length(body('Read_back_evidence')?['value']),1),equals(first(body('Read_back_evidence')?['value'])?['CaseId'],outputs('Compose_CaseId')),equals(first(body('Read_back_evidence')?['value'])?['LogFileName'],outputs('Compose_LogFileName')),equals(first(body('Read_back_evidence')?['value'])?['Environment'],outputs('Get_case')?['body/cr6cb_environment']),equals(first(body('Read_back_evidence')?['value'])?['Server'],outputs('Get_case')?['body/cr6cb_server']),equals(first(body('Read_back_evidence')?['value'])?['ReceivedAtJst'],convertTimeZone(outputs('Get_case')?['body/createdon'],'UTC','Tokyo Standard Time','yyyy-MM-dd HH:mm:ss')),startsWith(string(first(body('Read_back_evidence')?['value'])?['TargetDate']),formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd')),equals(string(first(body('Read_back_evidence')?['value'])?['ChunkIndex']),'1'),equals(string(first(body('Read_back_evidence')?['value'])?['ChunkCount']),'1'),equals(first(body('Read_back_evidence')?['value'])?['LogTextPart'],outputs('Compose_LogText')))",
                                         true
                                       ]
                                     },
@@ -755,7 +795,7 @@
                           "parameters": {
                             "entityName": "cr6cb_evidencecases",
                             "recordId": "@outputs('Compose_CaseId')",
-                            "item": "@addProperty(addProperty(json('{}'),'cr6cb_processingstatus','停止'),'cr6cb_failurereason','ログの日付・識別情報が件と一致しないか、1行上限を超えています。')"
+                            "item": "@addProperty(addProperty(json('{}'),'cr6cb_processingstatus','停止'),'cr6cb_failurereason',outputs('Compose_LogValidationReason'))"
                           },
                           "authentication": "@parameters('$authentication')",
                           "retryPolicy": {

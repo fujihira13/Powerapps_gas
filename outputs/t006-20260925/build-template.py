@@ -1,7 +1,8 @@
-"""Build the proposed one-case, multi-row evidence workbook.
+"""Build the new one-case evidence workbook with a JST receipt timestamp.
 
 The initial row is replaced with the first log chunk by the planned flow.
-The remaining chunks are appended. Cloud compatibility is not established.
+The remaining chunks are appended. The prior evidence-template.xlsx is kept as
+the historical template. Cloud compatibility is not established.
 """
 
 from pathlib import Path
@@ -11,13 +12,13 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
 
-OUTPUT = Path(__file__).with_name("evidence-template.xlsx")
+OUTPUT = Path(__file__).with_name("evidence-template-received-at-jst.xlsx")
 HEADERS = [
     "CaseId",
     "LogFileName",
     "Environment",
     "Server",
-    "RunNumber",
+    "ReceivedAtJst",
     "TargetDate",
     "ChunkIndex",
     "ChunkCount",
@@ -46,7 +47,7 @@ def main() -> None:
     sheet.row_dimensions[4].height = 25
 
     for column, width in zip(
-        "ABCDEFGHI", [38, 25, 22, 22, 14, 18, 15, 15, 70], strict=True
+        "ABCDEFGHI", [38, 25, 22, 22, 23, 18, 15, 15, 70], strict=True
     ):
         sheet.column_dimensions[column].width = width
     for column in "GHI":

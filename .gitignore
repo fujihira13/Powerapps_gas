@@ -67,3 +67,17 @@ outputs/flow-implementation/osts-candidates-metadata-v2/
 # Generated MQ definitions include live connection references; rebuild locally
 outputs/flow-implementation/flow-definition.mq-local-candidate.json
 outputs/flow-implementation/office-scripts/osts-candidates/
+
+# Live flow backup contains tenant-specific connection references
+outputs/runless-migration-20260927/flow-before.json
+outputs/runless-migration-20260927/flow-patch-body.json
+outputs/runless-migration-20260927/flow-after.json
+outputs/runless-migration-20260927/flow-before-readback-fix.json
+outputs/runless-migration-20260927/flow-after-datetime-fix.json
+outputs/runless-migration-20260927/flow-datetime-patch-body.json
+
+# Temporary Canvas probes and duplicate authoring readbacks
+outputs/canvas-runless-legacy-probe-20260927/
+outputs/runless-migration-20260927/canvas-pre-save-readback/
+outputs/runless-migration-20260927/canvas-date-probe-readback/
+outputs/runless-migration-20260927/canvas-after-card-fix-readback/

@@ -1,4 +1,4 @@
-"""Offline source checks for the MQ Canvas candidate.
+﻿"""Offline checks for the runless single-case Canvas candidate.
 
 These checks inspect authored YAML text only. They do not compile Power Fx,
 connect to Power Platform, or prove that attachment upload/readback works at runtime.
@@ -6,13 +6,14 @@ connect to Power Platform, or prove that attachment upload/readback works at run
 
 from __future__ import annotations
 
-import hashlib
 import unittest
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).parent
-WORKSPACE = ROOT / "workspace"
+WORKSPACE = ROOT.parent / "canvas-runless-live-sync-20260927"
 BASELINE = ROOT.parent / "canvas-mq-live-sync-20260927"
 EXPECTED_FILES = {
     "App.pa.yaml",
@@ -37,320 +38,199 @@ def attachment_handler(screen: str, name: str, next_name: str) -> str:
     )[0]
 
 
-class CanvasMqStaticChecks(unittest.TestCase):
-    def test_workspace_contains_only_the_six_canvas_yaml_files(self) -> None:
+def parse_yaml(file_name: str) -> dict:
+    return yaml.safe_load((WORKSPACE / file_name).read_text(encoding="utf-8-sig"))
+
+
+def canvas_screen(name: str) -> dict:
+    return parse_yaml(f"{name}.pa.yaml")["Screens"][name]
+
+
+def find_control(node, name: str) -> dict:
+    if isinstance(node, dict):
+        if name in node and isinstance(node[name], dict):
+            return node[name]
+        for value in node.values():
+            try:
+                return find_control(value, name)
+            except KeyError:
+                pass
+    elif isinstance(node, list):
+        for value in node:
+            try:
+                return find_control(value, name)
+            except KeyError:
+                pass
+    raise KeyError(name)
+
+
+def control_props(screen_name: str, control_name: str) -> dict:
+    return find_control(canvas_screen(screen_name), control_name)["Properties"]
+
+
+def has_balanced_parentheses(expression: str) -> bool:
+    depth = 0
+    in_string = False
+    index = 0
+    while index < len(expression):
+        char = expression[index]
+        if char == '"':
+            if in_string and index + 1 < len(expression) and expression[index + 1] == '"':
+                index += 2
+                continue
+            in_string = not in_string
+        elif not in_string and char == "(":
+            depth += 1
+        elif not in_string and char == ")":
+            depth -= 1
+            if depth < 0:
+                return False
+        index += 1
+    return depth == 0 and not in_string
+
+
+class RunlessCanvasStaticChecks(unittest.TestCase):
+    def test_synced_workspace_contains_six_valid_canvas_yaml_files(self) -> None:
+        self.assertEqual(EXPECTED_FILES, {path.name for path in WORKSPACE.glob("*.pa.yaml")})
+        for file_name in EXPECTED_FILES:
+            with self.subTest(file=file_name):
+                self.assertIsInstance(parse_yaml(file_name), dict)
+
+    def test_screen1_is_single_case_without_run_number_or_staging_queue(self) -> None:
+        source = (WORKSPACE / "Screen1.pa.yaml").read_text(encoding="utf-8-sig")
+        top_level = {next(iter(control)) for control in canvas_screen("Screen1")["Children"]}
+        self.assertNotIn("btnT001Stage", top_level)
+        self.assertNotIn("galT001Queue", top_level)
+        self.assertNotIn("radT001MqMode", top_level)
+        for obsolete in ("colT001Metadata", "varT001SelectedQueueId", "実行回", "RunNumber", "cr6cb_runnumber"):
+            with self.subTest(obsolete=obsolete):
+                self.assertNotIn(obsolete, source)
+        self.assertEqual(control_props("Screen1", "Form1")["DefaultMode"], "=FormMode.New")
+        self.assertEqual(control_props("Screen1", "DataCardValue5")["Items"], "=Parent.Default")
         self.assertEqual(
-            EXPECTED_FILES,
-            {path.name for path in WORKSPACE.glob("*.pa.yaml")},
+            control_props("Screen1", "対象処理日_DataCard1")["Default"],
+            "=If(Form1.Mode = FormMode.New, Today(), ThisItem.対象処理日)",
+        )
+        self.assertEqual(control_props("Screen1", "DateValue1")["IsEditable"], "=true")
+        self.assertNotIn("バッチExcel名_DataCard1", source)
+        self.assertIn(
+            "cr6cb_batchfilename:If(IsBlank(varT001SavingWorkbookName), Blank(), varT001SavingWorkbookName)",
+            control_props("Screen1", "Form1")["OnSuccess"],
         )
 
-    def test_app_screen4_and_editor_state_are_preserved(self) -> None:
-        for file_name in ("App.pa.yaml", "Screen4.pa.yaml", "_EditorState.pa.yaml"):
-            candidate_hash = hashlib.sha256((WORKSPACE / file_name).read_bytes()).hexdigest()
-            baseline_hash = hashlib.sha256((BASELINE / file_name).read_bytes()).hexdigest()
-            self.assertEqual(baseline_hash, candidate_hash, file_name)
+    def test_attachment_count_and_type_guards_allow_log_only_or_one_pair(self) -> None:
+        save_formula = control_props("Screen1", "btnT001Save")["OnSelect"]
+        for fragment in (
+            "logCount = 1 && bookCount <= 1",
+            "unsupportedCount = 0",
+            "attachmentCount = logCount + bookCount",
+            'EndsWith(Lower(file.Name), ".txt")',
+            'EndsWith(Lower(file.Name), ".xlsx")',
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, save_formula)
+        attachment_props = control_props("Screen1", "DataCardValue5")
+        self.assertEqual(attachment_props["Items"], "=Parent.Default")
+        for event_name in ("OnAddFile", "OnRemoveFile", "OnUndoRemoveFile"):
+            self.assertIn(event_name, attachment_props)
 
-    def test_intake_has_explicit_per_case_mode_and_attachment_guards(self) -> None:
-        screen = contents("Screen1.pa.yaml")
-        required_fragments = (
-            'Items: = ["ログのみ", "MQ照合"]',
-            "OnAddFile:",
-            "OnRemoveFile:",
-            'EndsWith(Lower(candidate.Name), ".xlsx")',
-            'FileRole = "Batch_Input"',
-            "varT001SelectedQueueId",
-            "MqRequested",
-            "varT001SavingMqRequested",
+    def test_duplicate_check_covers_log_new_batch_column_and_legacy_note(self) -> None:
+        save_formula = control_props("Screen1", "btnT001Save")["OnSelect"]
+        warning_text = control_props("Screen1", "lblT001MqMode")["Text"]
+        confirm = control_props("Screen1", "btnT001CancelItem")
+        for fragment in (
+            "cr6cb_caselabel = varT001SavingLogName",
+            "cr6cb_batchfilename = varT001SavingWorkbookName",
+            "Set(varS01LegacyExcelUnverified, false)",
+            "LookUp('メモ ', 'ファイル名' = varT001SavingWorkbookName)",
+            "AsType(varS01LegacyNote.'関連', [@'架空ログ証跡件']).cr6cb_evidencecaseid",
+            'MatchType:"Excel添付名"',
+            "!IsEmpty(colS01DuplicateCases) || varS01LegacyExcelUnverified",
+            "Set(varS01DuplicateReadOk, false)",
+            "!varS01DuplicateReadOk",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, save_formula)
+        self.assertNotIn("cr6cb_evidencecase_Annotations", save_formula)
+        for fragment in (
+            "内容が同一という判定ではありません",
+            "旧受付のExcel添付名を個別照合できない",
+            "TimeZoneOffset(duplicateCase.CreatedOn) + 540",
+            "Text(duplicateCase.EvidenceCaseId)",
+        ):
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, warning_text)
+        self.assertEqual(confirm["Visible"], "=varS01DuplicateWarning")
+        self.assertIn("varS01LegacyExcelUnverified", confirm["OnSelect"])
+        self.assertIn("SubmitForm(Form1)", confirm["OnSelect"])
+        self.assertIn("未照合を確認して新しい件として保存", confirm["Text"])
+        self.assertIn("修正する", control_props("Screen1", "btnS01Progress")["Text"])
+
+    def test_saved_state_requires_case_metadata_status_and_attachment_readback(self) -> None:
+        on_success = control_props("Screen1", "Form1")["OnSuccess"]
+        on_failure = control_props("Screen1", "Form1")["OnFailure"]
+        for fragment in (
+            "Form1.LastSubmit.cr6cb_evidencecaseid",
+            "!IsBlank(varT001ReadbackCase.createdon)",
+            "Refresh('架空ログ証跡件')",
+            "cr6cb_batchfilename",
             "CountRows(varT001ReadbackCase.Attachments)",
-            "varT001ReadbackLogCount = 1",
-            "varT001ReadbackWorkbookCount",
-            "varT001SaveVerified",
-            '"保存状況を確認しています"',
-        )
-        for fragment in required_fragments:
-            with self.subTest(fragment=fragment):
-                self.assertIn(fragment, screen)
-
-    def test_attachment_event_handlers_have_balanced_parentheses(self) -> None:
-        screen = contents("Screen1.pa.yaml")
-        for name, next_name in (
-            ("OnAddFile", "OnRemoveFile"),
-            ("OnRemoveFile", "OnUndoRemoveFile"),
-            ("OnUndoRemoveFile", "NoAttachmentsColor"),
-        ):
-            handler = attachment_handler(screen, name, next_name)
-            with self.subTest(handler=name):
-                self.assertEqual(handler.count("("), handler.count(")"))
-
-    def test_intake_mode_guidance_and_empty_queue_fit_without_overlapping(self) -> None:
-        screen = contents("Screen1.pa.yaml")
-        gallery = screen.split("      - galT001Queue:", 1)[1].split(
-            "      - btnT001CancelItem:", 1
-        )[0]
-        mode_label = screen.split("      - lblT001MqMode:", 1)[1].split(
-            "      - radT001MqMode:", 1
-        )[0]
-        radio = screen.split("      - radT001MqMode:", 1)[1].split(
-            "      - btnS01Progress:", 1
-        )[0]
-
-        self.assertIn("Height: =Parent.Height - 310", gallery)
-        self.assertIn("Y: =100", gallery)
-        self.assertIn("Height: =50", mode_label)
-        self.assertIn("AutoHeight: =false", mode_label)
-        self.assertIn("Y: =Parent.Height - 205", mode_label)
-        self.assertIn("ログを選ぶと受付対象が一覧に表示されます。", mode_label)
-        self.assertIn(".xlsx不可", mode_label)
-        self.assertIn("Y: =Parent.Height - 145", radio)
-
-    def test_start_flow_is_blocked_for_empty_queue_in_both_button_and_handler(self) -> None:
-        screen = contents("Screen1.pa.yaml")
-        start_button = screen.split("      - btnS01StartFlow:", 1)[1]
-        display_mode = start_button.split("            DisplayMode:", 1)[1].split(
-            "            Height:", 1
-        )[0]
-        on_select = start_button.split("            OnSelect:", 1)[1].split(
-            "            Text:", 1
-        )[0]
-
-        self.assertIn("IsEmpty(colT001Metadata)", display_mode)
-        self.assertIn("!IsEmpty(colT001Metadata)", on_select)
-
-    def test_initial_attachment_can_be_added_before_a_queue_item_exists(self) -> None:
-        screen = contents("Screen1.pa.yaml")
-        attachment = screen.split("                  - DataCardValue5:", 1)[1].split(
-            "                  - ErrorMessage6:", 1
-        )[0]
-        display_mode = next(
-            line.split("=", 1)[1]
-            for line in attachment.splitlines()
-            if line.strip().startswith("DisplayMode:")
-        )
-        stage_button = screen.split("      - btnT001Stage:", 1)[1].split(
-            "      - galT001Queue:", 1
-        )[0]
-        stage_display_mode = next(
-            line.split("=", 1)[1]
-            for line in stage_button.splitlines()
-            if line.strip().startswith("DisplayMode:")
-        )
-        stage_on_select = stage_button.split("            OnSelect:", 1)[1].split(
-            "            Text:", 1
-        )[0]
-
-        # With no queue selected, none of the disabled conditions should match;
-        # an existing queue only adds the saved/unknown-state lock.
-        for fragment in (
-            "Coalesce(varS01Starting, false)",
-            "Coalesce(varS01StartUnknown, false)",
-            "Coalesce(varT001Saving, false)",
-            "!IsBlank(varT001SelectedQueueId) && (",
-            "varT001UnknownQueueId = varT001SelectedQueueId",
-            'SaveStatus = "保存済み"',
-            'SaveStatus = "保存結果不明"',
+            "savedFile.DisplayName = varT001SavingLogName",
+            "savedFile.DisplayName = varT001SavingWorkbookName",
+            'cr6cb_processingstatus = "保存済み"',
+            "Set(varT001SaveVerified, true)",
+            "Set(varT001Saved, varT001ReadbackCase)",
         ):
             with self.subTest(fragment=fragment):
-                self.assertIn(fragment, display_mode)
-        self.assertNotIn("|| IsBlank(varT001SelectedQueueId)", display_mode)
+                self.assertIn(fragment, on_success)
+        status = control_props("Screen1", "lblS01FlowStatus")["Text"]
+        self.assertIn("varT001Saved.createdon", status)
+        self.assertIn("TimeZoneOffset(varT001Saved.createdon) + 540", status)
+        self.assertIn("Text(varT001Saved.cr6cb_evidencecaseid)", status)
+        self.assertIn("Set(varT001SaveUnknown, true)", on_failure)
+        self.assertIn("再保存せず進捗一覧で状態を確認", on_failure)
 
-        self.assertIn("!IsEmpty(colT001Metadata)", stage_display_mode)
-        self.assertIn("IsEmpty(colT001Metadata)", stage_on_select)
-        self.assertIn("!IsEmpty(DataCardValue5.Attachments)", stage_on_select)
-        self.assertIn("ClearCollect(colT001AttachmentSource, DataCardValue5.Attachments)", stage_on_select)
-
-    def test_add_file_handler_leaves_initial_attachments_in_the_control(self) -> None:
-        screen = contents("Screen1.pa.yaml")
-        on_add_file = attachment_handler(screen, "OnAddFile", "OnRemoveFile")
-
-        self.assertIn("!IsBlank(selectedCase) && !selectedCase.MqRequested", on_add_file)
-        self.assertNotIn("Reset(DataCardValue5)", on_add_file)
-        self.assertNotIn("ResetForm(Form1)", on_add_file)
-        self.assertNotIn("Clear(DataCardValue5)", on_add_file)
-        self.assertNotIn("ClearCollect(colT001AttachmentSource", on_add_file)
-
-    def test_attachment_items_use_native_source_for_initial_and_mq_rows(self) -> None:
-        screen = contents("Screen1.pa.yaml")
-        attachment = screen.split("                  - DataCardValue5:", 1)[1].split(
-            "                  - ErrorMessage6:", 1
-        )[0]
-        items_formula = next(
-            line.split("=", 1)[1].strip()
-            for line in attachment.splitlines()
-            if line.strip().startswith("Items:")
+    def test_authored_intake_formulas_have_balanced_parentheses_and_strings(self) -> None:
+        formulas = (
+            control_props("Screen1", "Form1")["OnSuccess"],
+            control_props("Screen1", "btnT001Save")["OnSelect"],
+            control_props("Screen1", "btnT001CancelItem")["OnSelect"],
+            control_props("Screen1", "btnS01StartFlow")["OnSelect"],
+            control_props("Screen1", "lblT001MqMode")["Text"],
         )
+        for index, formula in enumerate(formulas):
+            with self.subTest(formula=index):
+                self.assertTrue(has_balanced_parentheses(formula))
 
-        self.assertEqual(
-            items_formula,
-            "If(IsBlank(varT001SelectedQueueId) || LookUp(colT001Metadata, QueueId = varT001SelectedQueueId).MqRequested, Parent.Default, Filter(colT001QueueAttachments, QueueId = varT001SelectedQueueId))",
-        )
-        self.assertIn("Parent.Default", items_formula)
-        self.assertIn("Filter(colT001QueueAttachments, QueueId = varT001SelectedQueueId)", items_formula)
+    def test_save_and_start_are_separate_and_start_targets_one_verified_case(self) -> None:
+        save = control_props("Screen1", "btnT001Save")["OnSelect"]
+        start = control_props("Screen1", "btnS01StartFlow")
+        self.assertIn("SubmitForm(Form1)", save)
+        self.assertNotIn(".Run(", save)
+        self.assertIn(".Run(Text(varT001Saved.cr6cb_evidencecaseid))", start["OnSelect"])
+        self.assertNotIn("SubmitForm(Form1)", start["OnSelect"])
+        self.assertIn("Refresh('架空ログ証跡件')", start["OnSelect"])
+        self.assertIn("varS01StartReadback.cr6cb_processingstatus", start["OnSelect"])
+        self.assertIn('varT001Saved.cr6cb_processingstatus = "保存済み"', start["OnSelect"])
+        self.assertIn('cr6cb_processingstatus:"開始受付済み"', start["OnSelect"])
+        self.assertIn("varS01StartUnknown", start["DisplayMode"])
 
-    def test_mq_pair_staging_keeps_both_original_attachments_for_save(self) -> None:
-        screen = contents("Screen1.pa.yaml")
-        stage_button = screen.split("      - btnT001Stage:", 1)[1].split(
-            "      - galT001Queue:", 1
-        )[0]
-        stage_on_select = stage_button.split("            OnSelect:", 1)[1].split(
-            "            Text:", 1
-        )[0]
-        mq_branch = stage_on_select.split(
-            "If(\n                      bookCount = 1,", 1
-        )[1].split(",\n                      Set(varT001Saved, Blank());", 1)[0]
+    def test_screens_2_to_4_show_receipt_datetime_and_case_id_without_run_number(self) -> None:
+        for name in ("Screen2", "Screen3", "Screen4"):
+            source = (WORKSPACE / f"{name}.pa.yaml").read_text(encoding="utf-8-sig")
+            with self.subTest(screen=name):
+                self.assertNotIn("実行回", source)
+                self.assertNotIn("cr6cb_runnumber", source)
+                self.assertIn("createdon", source)
+                self.assertIn("cr6cb_evidencecaseid", source)
+                self.assertIn("TimeZoneOffset", source)
+                self.assertIn("TimeUnit.Hours", source)
 
-        self.assertIn("bookCount <> 1 || logCount <> 1 || attachmentCount <> 2", stage_on_select)
-        self.assertIn("ClearCollect(colT001AttachmentSource, DataCardValue5.Attachments)", mq_branch)
-        self.assertIn('FileName:LookUp(colT001AttachmentSource As candidate, EndsWith(Lower(candidate.Name), ".txt")).Name', mq_branch)
-        self.assertIn("MqRequested:true", mq_branch)
-        self.assertIn("ForAll(\n                          colT001AttachmentSource As candidate", mq_branch)
-        self.assertIn("Name:candidate.Name, Value:candidate.Value", mq_branch)
-        self.assertNotIn("ResetForm(Form1)", mq_branch)
-        self.assertNotIn("NewForm(Form1)", mq_branch)
-
-        # The multi-log-only queue still uses its original separate-per-log staging path.
-        self.assertIn("Sequence(CountRows(colT001AttachmentSource)) As seq", stage_on_select)
-        self.assertIn("ResetForm(Form1);\n                      NewForm(Form1)", stage_on_select)
-
-    def test_pre_staged_mq_pair_file_events_do_not_rebuild_its_attachment_set(self) -> None:
-        screen = contents("Screen1.pa.yaml")
-        for name, next_name in (
-            ("OnAddFile", "OnRemoveFile"),
-            ("OnRemoveFile", "OnUndoRemoveFile"),
-            ("OnUndoRemoveFile", "NoAttachmentsColor"),
-        ):
-            handler = attachment_handler(screen, name, next_name)
-            with self.subTest(handler=name):
-                self.assertIn("!IsBlank(selectedCase) && !selectedCase.MqRequested", handler)
-                self.assertIn("RemoveIf(colT001QueueAttachments", handler)
-                self.assertLess(
-                    handler.index("!IsBlank(selectedCase) && !selectedCase.MqRequested"),
-                    handler.index("RemoveIf(colT001QueueAttachments"),
-                )
-
-    def test_reselecting_the_current_mq_queue_does_not_reset_its_form(self) -> None:
-        screen = contents("Screen1.pa.yaml")
-        select_button = screen.split("            - btnT001Select:", 1)[1].split(
-            "      - btnT001CancelItem:", 1
-        )[0]
-        on_select = select_button.split("                  OnSelect: |-")
-        self.assertEqual(len(on_select), 2)
-        on_select = on_select[1].split("                  Text:", 1)[0]
-
-        guard = "ThisItem.QueueId <> varT001SelectedQueueId || !LookUp(colT001Metadata, QueueId = ThisItem.QueueId).MqRequested"
-        self.assertIn(guard, on_select)
-        self.assertLess(on_select.index(guard), on_select.index("ResetForm(Form1)"))
-
-    def test_save_keeps_the_explicit_attachment_pair_guard(self) -> None:
-        screen = contents("Screen1.pa.yaml")
-        attachment_card = screen.split("            - Attachments_DataCard1:", 1)[1].split(
-            "      - btnT001Save:", 1
-        )[0]
-        save_button = screen.split("      - btnT001Save:", 1)[1].split(
-            "      - btnT001Stage:", 1
-        )[0]
-        display_mode = save_button.split("            DisplayMode: |-", 1)[1].split(
-            "            Height:", 1
-        )[0]
-        on_select = save_button.split("            OnSelect: |-", 1)[1].split(
-            "            Text:", 1
-        )[0]
-
-        self.assertIn("Required: =false", attachment_card)
-        self.assertIn("!Form1.Valid", display_mode)
-        self.assertIn("!pairValid", display_mode)
-        self.assertIn("Form1.Valid && pairValid", on_select)
-
-    def test_save_disabled_status_reports_the_blocking_checks(self) -> None:
-        screen = contents("Screen1.pa.yaml")
-        status_label = screen.split("      - lblS01FlowStatus:", 1)[1]
-
-        for fragment in (
-            "btnT001Save.DisplayMode = DisplayMode.Disabled",
-            "Form1.Valid=NG",
-            "pairValid:",
-            'If(runNumberValid, "OK", "NG")',
-            'If(IsBlank(DataCardValue2.Selected.Value), "NG", "OK")',
-            'If(IsBlank(DataCardValue3.Selected.Value), "NG", "OK")',
-            'If(IsBlank(DateValue1.SelectedDate), "NG", "OK")',
-            "varT001UnknownQueueId = varT001SelectedQueueId",
-            "!IsBlank(varT001UnknownQueueId)",
-        ):
-            with self.subTest(fragment=fragment):
-                self.assertIn(fragment, status_label)
-
-        card_names = (
-            "'ログ名_DataCard1'",
-            "'環境名_DataCard1'",
-            "'サーバー名_DataCard1'",
-            "'実行回数_DataCard1'",
-            "'対象処理日_DataCard1'",
-            "Attachments_DataCard1",
-        )
-        for card_name in card_names:
-            with self.subTest(card=card_name):
-                self.assertIn(f"{card_name}.Valid", status_label)
-                self.assertIn(f"{card_name}.Update", status_label)
-                self.assertIn(f"{card_name}.Required", status_label)
-                self.assertIn(f"{card_name}.Error", status_label)
-
-        self.assertIn("Filter(formCards, !CardValid)", status_label)
-        self.assertIn("CountRows(Attachments_DataCard1.Update)", status_label)
-        self.assertNotIn("file.Value", status_label)
-        self.assertNotIn("candidate.Value", status_label)
-
-    def test_progress_shows_verified_mq_summary_without_claiming_success(self) -> None:
-        screen = contents("Screen2.pa.yaml")
-        for column in (
-            "cr6cb_mqterminalstatus",
-            "cr6cb_mqexpectedcount",
-            "cr6cb_mqloggedcount",
-            "cr6cb_mqmissingcount",
-            "cr6cb_mqcomparisonstatus",
-        ):
-            with self.subTest(column=column):
-                self.assertIn(column, screen)
-        self.assertIn("ALL SUCCESS", screen)
-        self.assertIn("全ID成功を意味しません", screen)
-        self.assertIn("未記録・要確認", screen)
-        self.assertIn('ThisItem.cr6cb_mqterminalstatus = "なし"', screen)
-        self.assertIn("ログ不完全・要確認", screen)
-
-    def test_case_detail_separates_the_two_inputs_and_exposes_comparison_evidence(self) -> None:
-        screen = contents("Screen3.pa.yaml")
-        for fragment in (
-            'EndsWith(Lower(DisplayName), ".txt")',
-            'EndsWith(Lower(DisplayName), ".xlsx")',
-            "cr6cb_mqmissingids",
-            "cr6cb_mqterminalstatus",
-            "cr6cb_mqexpectedcount",
-            "cr6cb_mqloggedcount",
-            "cr6cb_mqmissingcount",
-            "cr6cb_mqresulttext",
-            "cr6cb_mqcomparisonstatus",
-            "varEvidenceCase.cr6cb_excelurl",
-            "ALL SUCCESS",
-            "全ID成功を意味しません",
-            "未記録・要確認",
-            "ログ不完全・要確認",
-            "radCaseCompare:",
-            "radCaseJudgment:",
-            "btnCaseRequestReview:",
-        ):
-            with self.subTest(fragment=fragment):
-                self.assertIn(fragment, screen)
-
-    def test_canvas_label_controls_do_not_use_unsupported_accessiblelabel(self) -> None:
-        screen1 = contents("Screen1.pa.yaml")
-        mode_label = screen1.split("      - lblT001MqMode:", 1)[1].split(
-            "      - radT001MqMode:", 1
-        )[0]
-        self.assertNotIn("AccessibleLabel:", mode_label)
-
-        screen3 = contents("Screen3.pa.yaml")
-        result_label = screen3.split("            - lblCaseMqResultRow:", 1)[1].split(
-            "      - lblCaseFailure:", 1
-        )[0]
-        self.assertNotIn("AccessibleLabel:", result_label)
+    def test_four_screens_and_review_actions_remain(self) -> None:
+        for name in ("Screen1", "Screen2", "Screen3", "Screen4"):
+            self.assertTrue((WORKSPACE / f"{name}.pa.yaml").exists())
+        self.assertIn("btnCaseRequestReview", (WORKSPACE / "Screen3.pa.yaml").read_text(encoding="utf-8-sig"))
+        self.assertIn("varDemoRole", (WORKSPACE / "Screen4.pa.yaml").read_text(encoding="utf-8-sig"))
 
 
 if __name__ == "__main__":

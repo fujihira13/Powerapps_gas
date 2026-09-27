@@ -7,19 +7,13 @@
 プロジェクトルートで実行します。
 
 ```powershell
-python outputs/flow-implementation/build_flow_definition.py --mq-candidate
+python outputs/flow-implementation/build_flow_definition.py --mq-candidate --mq-script-id-source outputs/runless-migration-20260927/flow-before.json
 python outputs/flow-implementation/build_mq_column_payloads.py
 python outputs/flow-implementation/build_osts_wrappers.py
 python -m unittest discover -s outputs/flow-implementation -p "test_*.py"
 ```
 
-生成物は`flow-definition.mq-local-candidate.json`、`dataverse-column-payloads/`内の7列JSON、`office-scripts/osts-candidates/`内の3つの`.osts`候補です。**このローカル候補ファイル内**の3つのOffice Script IDは、実際のテナントIDではなく、次のプレースホルダーのままです。別途更新された現行フローとOneDrive上のScriptはこれらの未登録候補ではありません。
-
-- `__SELECT_MQ_BATCH_READER_SCRIPT__`
-- `__SELECT_MQ_COMPARISON_WRITER_SCRIPT__`
-- `__SELECT_MQ_COMPARISON_READBACK_SCRIPT__`
-
-そのままPower Automateへ登録して実行できる状態ではありません。
+生成物は`flow-definition.mq-local-candidate.json`、`dataverse-column-payloads/`内の7列JSON、`office-scripts/osts-candidates/`内の3つの`.osts`候補です。今回のMQフロー候補は保存済みの現行フローGETからOffice Script ID 3つを継承し、元フローの値と一致することをローカルで確認しました。候補は未反映であり、新しい結果Excelひな形のOneDrive配置とフロー更新・読戻しを終えるまで実行対象ではありません。別環境で生成する場合は、その環境の現行フローとScript IDを別途確認してください。
 
 ## 現行候補からの差分
 
@@ -45,7 +39,7 @@ python -m unittest discover -s outputs/flow-implementation -p "test_*.py"
 
 Developer環境ではOneDrive上のScript 3件（Writer／readbackはversion 3.0）とFlow guardの更新・読戻しを確認し、run92704で1件のフロー実行、出力2シート、case状態、画面を照合しました。これは当該の架空入力1件の実機確認です。ローカル生成物は現行クラウドフローの正本ではなく、未試験の異常系・ログのみ経路・他環境のライセンスや権限、別環境への移植性は未確認です。ローカル`.osts`候補全体の独立コンパイルも行っていません。
 
-このローカル生成物を今後別環境へ反映する場合は、その環境用に3つのScript IDを割り当て、Run scriptアクションのスキーマと列・権限を確認し、出力シートとEvidence表を独立読戻ししてください。Developer環境の既存実装はrun92704を完了済みのため再実行せず、将来の別試験では新しい実行回を用います。実機試験の詳細と未完了条件は`docs/TASKS.md` T-013を参照してください。
+このローカル生成物を今後別環境へ反映する場合は、その環境用に3つのScript IDを割り当て、Run scriptアクションのスキーマと列・権限を確認し、出力シートとEvidence表を独立読戻ししてください。Developer環境の既存実装はrun92704を完了済みのため再実行せず、今回の新仕様の統合試験では実行回を入力しない新件を使用します。実機試験の詳細と未完了条件は`docs/TASKS.md` T-013・T-014を参照してください。
 
 Microsoft Learnで確認したOffice Scriptsの新規作成経路はExcelの`Automate > New Script > Create in Code Editor` UIです。Office ScriptsはOneDriveの`Documents/Office Scripts`に`.osts`ファイルとして保存されます。Microsoft Learnは拡張子と保存先を説明していますが、今回参照した公式資料に`.osts`本文のJSONスキーマや`version`/`body`フィールドの定義はありません。ローカル候補は公開されている`.osts`実例の`version: "0.2.0"`に合わせ、TypeScript本文をそのまま`body`に入れたJSON包装にしています。この値と包装形式は公式仕様として保証されず、Office Scriptsで解釈できるか未検証です。静的テストで本文一致とJSON可読性は確かめますが、Excel UIへの読込、Office Scriptsコンパイル、OneDrive保存・読戻しは未検証です。これらの`.osts`候補はローカルに作るだけで、API送信や登録は行いません。
 

@@ -22,7 +22,7 @@ HEADERS = [
     "LogFileName",
     "Environment",
     "Server",
-    "RunNumber",
+    "ReceivedAtJst",
     "TargetDate",
     "ChunkIndex",
     "ChunkCount",
@@ -73,22 +73,29 @@ def parse_log(text: str, case: dict[str, Any]) -> None:
         raise StopCase("冒頭の処理日がYYYY-MM-DD形式ではありません")
     if date_text != case["targetDate"]:
         raise StopCase("ログの処理日と対象処理日が一致しません")
+    if len(lines) < 2 or not lines[1].startswith("環境: "):
+        raise StopCase("ログに環境の識別情報がありません")
+    if lines[1] != f"環境: {case['environment']}":
+        raise StopCase("ログの環境が保存済みの値と一致しません")
+    if len(lines) < 3 or not lines[2].startswith("サーバー: "):
+        raise StopCase("ログにサーバーの識別情報がありません")
+    if lines[2] != f"サーバー: {case['server']}":
+        raise StopCase("ログのサーバーが保存済みの値と一致しません")
 
-    parsed: dict[str, str] = {}
-    for line in lines[:5]:
-        if ": " in line:
-            key, value = line.split(": ", 1)
-            parsed[key] = value
-    for log_key, case_key, label in (
-        ("環境", "environment", "環境"),
-        ("サーバー", "server", "サーバー"),
-        ("実行回", "runNumber", "実行回"),
-    ):
-        value = parsed.get(log_key)
-        if not value:
-            raise StopCase(f"ログの{label}がありません")
-        if str(value) != str(case[case_key]):
-            raise StopCase(f"ログの{label}が保存済みの値と一致しません")
+
+def received_at_jst(case: dict[str, Any]) -> str:
+    """Format Dataverse createdon as JST with second precision."""
+    value = str(case.get("createdOnUtc", "")).strip()
+    if not value:
+        raise StopCase("受付日時がありません")
+    try:
+        created = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise StopCase("受付日時を読み取れません") from exc
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=dt.timezone.utc)
+    jst = created.astimezone(dt.timezone(dt.timedelta(hours=9)))
+    return jst.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def validate_case(case: dict[str, Any], log_text: str, log_path: Path) -> None:
@@ -110,12 +117,7 @@ def validate_case(case: dict[str, Any], log_text: str, log_path: Path) -> None:
         if not str(case.get(key, "")).strip():
             raise StopCase(f"{label}がありません")
 
-    try:
-        run_number = int(case["runNumber"])
-    except (KeyError, TypeError, ValueError) as exc:
-        raise StopCase("実行回が1以上の整数ではありません") from exc
-    if run_number < 1 or str(run_number) != str(case["runNumber"]):
-        raise StopCase("実行回が1以上の整数ではありません")
+    received_at_jst(case)
     if log_path.name != case["logFileName"]:
         raise StopCase("指定された元ファイル名と実ファイル名が一致しません")
     parse_log(log_text, case)
@@ -153,7 +155,7 @@ def row_values(case: dict[str, Any], index: int, count: int, part: str) -> list[
         case["logFileName"],
         case["environment"],
         case["server"],
-        int(case["runNumber"]),
+        received_at_jst(case),
         case["targetDate"],
         index,
         count,
@@ -275,7 +277,7 @@ def case_for_sample(name: str, *, target_date: str | None = None) -> dict[str, A
         "startStatus": "開始受付済み",
         "environment": values.get("環境", "架空環境H"),
         "server": values.get("サーバー", "架空サーバーH"),
-        "runNumber": values.get("実行回", "1"),
+        "createdOnUtc": "2026-09-27T03:04:05Z",
         "targetDate": target_date or values.get("処理日", "2026-09-25"),
         "logFileName": path.name,
         "logPath": str(path),
@@ -283,11 +285,11 @@ def case_for_sample(name: str, *, target_date: str | None = None) -> dict[str, A
 
 
 def self_test() -> None:
-    template = ROOT / "outputs" / "t006-20260925" / "evidence-template.xlsx"
+    template = ROOT / "outputs" / "t006-20260925" / "evidence-template-received-at-jst.xlsx"
     with tempfile.TemporaryDirectory(prefix="case-transfer-") as directory:
         output_dir = Path(directory) / "output"
 
-        normal = case_for_sample("normal-a.txt")
+        normal = case_for_sample("normal-runless.txt")
         success = run_case(normal, template, output_dir)
         assert success["processingStatus"] == "転記済み", success
         assert success["excelCheckStatus"] == "全文一致", success
@@ -308,19 +310,24 @@ def self_test() -> None:
             case_for_sample("missing-date.txt"),
             case_for_sample("missing-identifier.txt"),
         ]
+        environment_mismatch = case_for_sample("normal-runless.txt")
+        environment_mismatch["environment"] = "架空環境の不一致"
+        server_mismatch = case_for_sample("normal-runless.txt")
+        server_mismatch["server"] = "架空サーバーの不一致"
+        stop_cases.extend((environment_mismatch, server_mismatch))
         for case in stop_cases:
             result = run_case(case, template, output_dir)
             assert result["processingStatus"] == "停止", result
             assert result["localWorkbook"] is None, result
 
-    print("Offline self-test passed: normal, duplicate guard, long Unicode, and four stop cases.")
+    print("Offline self-test passed: runless log, duplicate guard, long Unicode, and six stop cases.")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--case-json", type=Path)
-    parser.add_argument("--template", default="outputs/t006-20260925/evidence-template.xlsx")
+    parser.add_argument("--template", default="outputs/t006-20260925/evidence-template-received-at-jst.xlsx")
     parser.add_argument("--output-dir", default="outputs/flow-implementation/local-output")
     args = parser.parse_args()
 

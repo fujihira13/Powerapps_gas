@@ -144,6 +144,44 @@ class FlowDefinitionTests(unittest.TestCase):
         self.assertIn("Update_case_stop_mq_input_invalid", incomplete_gate["else"]["actions"])
         self.assertIn("result_text", find_action(actions, "Update_case_mq_incomplete_diagnostic")["inputs"]["parameters"]["item"])
 
+    def test_mq_candidate_inherits_exact_three_script_ids_from_saved_flow_get(self):
+        from build_flow_definition import (
+            MQ_SCRIPT_ACTION_NAMES,
+            build_mq_candidate,
+            load_mq_script_ids,
+            validate_mq_candidate,
+        )
+
+        source_path = (
+            Path(__file__).resolve().parents[2]
+            / "outputs"
+            / "runless-migration-20260927"
+            / "flow-before.json"
+        )
+        source = json.loads(source_path.read_text(encoding="utf-8-sig"))
+        live_clientdata = json.loads(source["clientdata"])
+        live_actions = live_clientdata["properties"]["definition"]["actions"]
+        expected_ids = {
+            role: find_action(live_actions, action_name)["inputs"]["parameters"]["scriptId"]
+            for role, action_name in MQ_SCRIPT_ACTION_NAMES.items()
+        }
+        selected_ids = load_mq_script_ids(source_path)
+        self.assertEqual(selected_ids, expected_ids)
+
+        candidate = build_mq_candidate(script_ids=selected_ids)
+        candidate_actions = candidate["properties"]["definition"]["actions"]
+        actual_ids = {
+            role: find_action(candidate_actions, action_name)["inputs"]["parameters"]["scriptId"]
+            for role, action_name in MQ_SCRIPT_ACTION_NAMES.items()
+        }
+        serialized = json.dumps(candidate, ensure_ascii=False)
+        self.assertEqual(actual_ids, expected_ids)
+        self.assertEqual(len(actual_ids), 3)
+        self.assertNotIn("__SELECT_MQ_", serialized)
+        self.assertEqual(
+            validate_mq_candidate(candidate, expected_script_ids=selected_ids), []
+        )
+
     def test_mq_result_write_and_independent_readback_gate_success(self):
         from build_flow_definition import build_mq_candidate
 
@@ -495,7 +533,7 @@ class FlowDefinitionTests(unittest.TestCase):
         ):
             self.assertIn(operation_id, all_actions)
         self.assertIn('"overwrite": false', all_actions)
-        self.assertIn("/架空ログ証跡アプリ完成版検証-T006-20260925/evidence-template.xlsx", all_actions)
+        self.assertIn("/架空ログ証跡アプリ完成版検証-T006-20260925/evidence-template-received-at-jst.xlsx", all_actions)
 
     def test_excelurl_candidate_writes_encoded_url_only_after_verified_readback(self):
         browser_root = (
@@ -669,6 +707,9 @@ class FlowDefinitionTests(unittest.TestCase):
         self.assertIn("全文一致", json.dumps(actions, ensure_ascii=False))
         self.assertIn("__TEMPLATE__", json.dumps(actions, ensure_ascii=False))
         self.assertIn("30", json.dumps(actions, ensure_ascii=False))
+        get_case = actions["Get_case"]["inputs"]["parameters"]
+        self.assertIn("createdon", get_case["$select"])
+        self.assertNotIn("cr6cb_runnumber", get_case["$select"])
 
     def test_log_validation_records_a_specific_pre_copy_failure_reason(self):
         actions = build_clientdata()["properties"]["definition"]["actions"]
@@ -691,12 +732,13 @@ class FlowDefinitionTests(unittest.TestCase):
             "ログの環境が件の環境と一致しません。",
             "ログにサーバーの識別情報がありません。",
             "ログのサーバーが件のサーバーと一致しません。",
-            "ログに実行回の識別情報がありません。",
-            "ログの実行回が件の実行回と一致しません。",
             "ログ本文が処理上限の30,000文字を超えています。",
         ):
             with self.subTest(message=message):
                 self.assertIn(message, reason)
+        self.assertNotIn("実行回", reason)
+        self.assertNotIn("cr6cb_runnumber", reason)
+        self.assertNotIn("Compose_LogLines')?[3]", reason)
 
         # Guard every indexed/substring date check before evaluating it and
         # make the same reason expression authoritative for acceptance.
@@ -826,7 +868,7 @@ class FlowDefinitionTests(unittest.TestCase):
                 f"equals({row}['LogFileName'],outputs('Compose_LogFileName'))",
                 f"equals({row}['Environment'],outputs('Get_case')?['body/cr6cb_environment'])",
                 f"equals({row}['Server'],outputs('Get_case')?['body/cr6cb_server'])",
-                f"equals(string({row}['RunNumber']),string(outputs('Get_case')?['body/cr6cb_runnumber']))",
+                f"equals(formatDateTime({row}['ReceivedAtJst'],'yyyy-MM-dd HH:mm:ss'),convertTimeZone(outputs('Get_case')?['body/createdon'],'UTC','Tokyo Standard Time','yyyy-MM-dd HH:mm:ss'))",
                 f"startsWith(string({row}['TargetDate']),formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd'))",
                 f"equals(string({row}['ChunkIndex']),'1')",
                 f"equals(string({row}['ChunkCount']),'1')",
@@ -966,12 +1008,26 @@ class FlowDefinitionTests(unittest.TestCase):
                 errors,
             )
 
-    def test_current_c02_candidate_satisfies_local_failure_path_validator(self):
+    def test_c02_snapshot_is_preserved_and_new_excelurl_candidate_uses_received_at(self):
         candidate_path = Path(__file__).with_name(
             "flow-definition.excelurl-c02-local-candidate.json"
         )
-        candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
-        self.assertEqual(validate_excelurl_candidate(candidate), [])
+        historical_candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+        historical_readback = find_action(
+            historical_candidate["properties"]["definition"]["actions"],
+            "Read_back_evidence",
+        )
+        self.assertIn("RunNumber", historical_readback["inputs"]["parameters"]["$select"])
+        self.assertEqual(validate_excelurl_candidate(historical_candidate), [])
+
+        new_candidate = build_excelurl_candidate()
+        self.assertEqual(validate_excelurl_candidate(new_candidate), [])
+        new_actions = new_candidate["properties"]["definition"]["actions"]
+        new_readback = find_action(new_actions, "Read_back_evidence")
+        new_write = find_action(new_actions, "Replace_template_row")
+        self.assertIn("ReceivedAtJst", new_readback["inputs"]["parameters"]["$select"])
+        self.assertNotIn("RunNumber", new_readback["inputs"]["parameters"]["$select"])
+        self.assertIn("ReceivedAtJst", new_write["inputs"]["parameters"]["item"])
 
     def test_validator_rejects_cycles_and_out_of_scope_run_after(self):
         import copy
@@ -994,6 +1050,8 @@ class FlowDefinitionTests(unittest.TestCase):
 
         status = build_status()
         self.assertEqual(status["status"], "local definition artifact; deployment and runtime status are tracked in docs/TASKS.md")
+        self.assertTrue(any("date, environment, and server" in item for item in status["scope"]))
+        self.assertFalse(any("run number" in item.lower() for item in status["scope"]))
         self.assertTrue(
             any(
                 "concurrent-start locking" in item.lower()

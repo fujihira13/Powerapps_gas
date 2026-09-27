@@ -8,22 +8,26 @@ Developer環境のPower Apps (V2)からDataverseの対象1件を受け取り、�
 
 2026-09-26、C02の理由具体化候補を既存フローへ条件付きPATCHし、HTTP 204と直後GETの完全一致、フローの有効状態を確認しました。反映定義は`flow-definition.excelurl-c02-local-candidate.json`（SHA-256 `917d7ec981b5490da494d8f5b3f14b58cf6b2ad723870360634d96ab60bbfe1b`）と一致します。反映後、無効暦日G・日付行なしD・サーバー行なしHの3件が、それぞれ具体的な理由付きで`停止`し、Excelが0冊であることを実機確認しました。さらに正常回帰A/A/run102（対象日2026-09-26、件ID `25ba005c-76b9-f111-b377-7ced8d3141aa`）で、添付1件・177B、件状態`転記済み`／`全文一致`とExcel URL、SharePoint上の結果Excel 1冊・8,265B、Evidence 9列・1行およびログ全文一致を確認しました。旧Bの`結果不明`は維持し、C02添付本文読取不能・異常と正常の混在、C03・C04・C08・C09の失敗・復旧条件は未完了です。詳細は`docs/TASKS.md`を参照してください。
 
+2026-09-27、1件受付・実行回なし化をDeveloper環境の既存フローへ反映しました。ログの先頭3項目（処理日・環境・サーバー）を照合し、旧ログに実行回行があっても受け付けます。新しい結果Excelは別名のひな形を使い、`RunNumber`の代わりにDataverseの`createdon`を日本時間にした`ReceivedAtJst`を件IDとともに書き込みます。初回の実機確認ではExcelコネクターが日時をISO形式へ正規化したため読戻し比較が偽不一致となり、件は`結果不明`になりました。この件は再実行せず保全しています。比較式を日時形式へ正規化した後、追加承認を受けた別の架空件1件で`転記済み`／`全文一致`、MQ予定5・記録4・欠落`MQ-0003`を確認し、結果ブックの`証跡`と`MQ_Comparison`も読戻しました。アプリは非公開のままです。詳細と未確認範囲は`docs/TASKS.md`のT-014を参照してください。
+
 ## 生成物
 
 - `workflow-create-body.json`: Dataverse Web API `POST /api/data/v9.2/workflows`に渡す純粋なworkflowオブジェクト。`clientdata`はJSON文字列です。
-- `flow-definition.candidate.json`: 初版のWDL `clientdata`。Excel URL／読戻し版より前の旧定義で、現在の稼働版として使いません。
+- `flow-definition.candidate.json`: 1件受付・実行回なし化の通常経路を含むローカルWDL `clientdata`。MQ経路を含む稼働版全体とは異なります。
+- `flow-definition.mq-local-candidate.json`: 同じ変更をMQ経路へ含め、保存済み稼働フローからOffice Scriptの3つの`scriptId`だけを引き継いだローカル候補。接続参照を含む生成物のためGit管理から除外し、`python outputs/flow-implementation/build_flow_definition.py --mq-candidate --mq-script-id-source outputs/runless-migration-20260927/flow-before.json`で再生成します。
 - `flow-definition.excelurl-c02-local-candidate.json`: Excel URL／読戻し経路にC02の具体的な入力異常理由・実在日付検査・添付本文読取失敗時の停止記録を加えた定義。条件付きPATCH後の稼働定義と直後GETで完全一致を確認済みです。
 - `workflow-create-api-request.json`: 宛先と送信bodyを含むローカルプレビュー。送信機能はありません。
 - `flow-candidate-status.json`: 実装範囲、確認済み事項、制限と未確認事項。
 - `build_flow_definition.py`: 決定的な生成とローカル静的検査。
 - `test_flow_definition.py`: WDL構造と安全条件のオフラインテスト。
+- `../t006-20260925/evidence-template-received-at-jst.xlsx`: 新しい候補だけがコピーするひな形。旧`evidence-template.xlsx`は維持します。
 
 ## フロー経路
 
 1. `caseId`をPower Apps (V2)トリガーから受け取り、Dataverseの案件行を取得します。
-2. 状態が`開始受付済み`であること、添付メモが1件であること、ログ内の処理日・環境・サーバー・実行番号が案件と一致することを確認します。
+2. 状態が`開始受付済み`であること、添付メモがログのみなら1件、MQ照合なら2件であることを確認します。現在の稼働版はログ内の処理日・環境・サーバーを照合し、実行回を要求しません。
 3. 環境・サーバーに一致する有効な転記先が1件だけで、指定のT006フォルダーと一致することを確認します。
-4. 同一caseIdの固定ファイル名を使い、実動作確認済みのT002と同じ`CopyDriveFileByPath`形式でT006ひな形をコピーします。`overwrite=false`です。
+4. 同一caseIdの固定ファイル名を使い、実動作確認済みのT002と同じ`CopyDriveFileByPath`形式で`evidence-template-received-at-jst.xlsx`をコピーします。`overwrite=false`です。
 5. Excelの`Evidence`表にあるひな形行を置換し、値を読み戻して照合します。読戻しが0行だった場合だけ10秒後に1回、読取専用で再照会します。1行の9項目がすべて一致した場合だけ状態を`転記済み`、確認結果を`全文一致`にします。再照会でも確認できなければ`結果不明`です。
 
 コピー前の検査不合格は理由とともに`停止`を記録します。無効暦日・日付行欠落・サーバー識別情報欠落の3ケースは、反映後の実機で具体的な停止理由とExcel未作成を確認しました。コピー以降の失敗・読戻し不一致は`結果不明`とし、OneDrive／Excelを確認するまで再実行しません。読戻し一致の成功分岐だけで既存ファイルの直接URLを`excelurl`へ記録し、共有リンクは作りません。反映後の正常回帰A/A/run102では添付1件・177Bから`転記済み`／`全文一致`、Excel URL、結果Excel 1冊・8,265B、Evidence 9列・1行とログ全文一致を実機確認しました。添付本文読取失敗・タイムアウト、異常と正常の混在、C03・C04・C08・C09の復旧条件は未確認または未実装です。
@@ -40,7 +44,9 @@ Developer環境のPower Apps (V2)からDataverseの対象1件を受け取り、�
 
 ```powershell
 python -m unittest discover -s outputs/flow-implementation -p test_flow_definition.py
+python -m unittest discover -s outputs/flow-implementation -p 'test_*.py'
 python outputs/flow-implementation/build_flow_definition.py
+python outputs/flow-implementation/build_flow_definition.py --mq-candidate --mq-script-id-source outputs/runless-migration-20260927/flow-before.json
 python outputs/flow-implementation/case_transfer.py --self-test
 ```
 

@@ -1,0 +1,111 @@
+{
+  "MetadataId": "c37d9ebe-9db8-f111-b377-7ced8d3141aa",
+  "HasChanged": null,
+  "AttributeOf": null,
+  "AttributeType": "Integer",
+  "ColumnNumber": 37,
+  "DeprecatedVersion": null,
+  "IntroducedVersion": "1.0",
+  "EntityLogicalName": "cr6cb_evidencecase",
+  "IsCustomAttribute": true,
+  "IsPrimaryId": false,
+  "IsValidODataAttribute": true,
+  "IsPrimaryName": false,
+  "IsValidForCreate": true,
+  "IsValidForRead": true,
+  "IsValidForUpdate": true,
+  "CanBeSecuredForRead": true,
+  "CanBeSecuredForCreate": true,
+  "CanBeSecuredForUpdate": true,
+  "IsSecured": false,
+  "IsRetrievable": false,
+  "IsFilterable": false,
+  "IsSearchable": false,
+  "IsManaged": false,
+  "LinkedAttributeId": null,
+  "LogicalName": "cr6cb_runnumber",
+  "IsValidForForm": true,
+  "IsRequiredForForm": false,
+  "IsValidForGrid": true,
+  "SchemaName": "cr6cb_RunNumber",
+  "ExternalName": null,
+  "IsLogical": false,
+  "IsDataSourceSecret": false,
+  "InheritsFrom": null,
+  "CreatedOn": "2026-09-25T04:58:28Z",
+  "ModifiedOn": "2026-09-25T04:58:28Z",
+  "SourceType": 0,
+  "AutoNumberFormat": null,
+  "Format": "None",
+  "MaxValue": 2147483647,
+  "MinValue": 1,
+  "FormulaDefinition": "",
+  "SourceTypeMask": 0,
+  "AttributeTypeName": {
+    "Value": "IntegerType"
+  },
+  "Description": {
+    "LocalizedLabels": [],
+    "UserLocalizedLabel": null
+  },
+  "DisplayName": {
+    "LocalizedLabels": [
+      {
+        "Label": "実行回",
+        "LanguageCode": 1041,
+        "IsManaged": false,
+        "MetadataId": "e4426b33-7fa3-4efa-83b0-f8c504687b85",
+        "HasChanged": null
+      }
+    ],
+    "UserLocalizedLabel": {
+      "Label": "実行回",
+      "LanguageCode": 1041,
+      "IsManaged": false,
+      "MetadataId": "e4426b33-7fa3-4efa-83b0-f8c504687b85",
+      "HasChanged": null
+    }
+  },
+  "IsAuditEnabled": {
+    "Value": true,
+    "CanBeChanged": true,
+    "ManagedPropertyLogicalName": "canmodifyauditsettings"
+  },
+  "IsGlobalFilterEnabled": {
+    "Value": false,
+    "CanBeChanged": true,
+    "ManagedPropertyLogicalName": "canmodifyglobalfiltersettings"
+  },
+  "IsSortableEnabled": {
+    "Value": false,
+    "CanBeChanged": true,
+    "ManagedPropertyLogicalName": "canmodifyissortablesettings"
+  },
+  "IsCustomizable": {
+    "Value": true,
+    "CanBeChanged": true,
+    "ManagedPropertyLogicalName": "iscustomizable"
+  },
+  "IsRenameable": {
+    "Value": true,
+    "CanBeChanged": true,
+    "ManagedPropertyLogicalName": "isrenameable"
+  },
+  "IsValidForAdvancedFind": {
+    "Value": true,
+    "CanBeChanged": true,
+    "ManagedPropertyLogicalName": "canmodifysearchsettings"
+  },
+  "RequiredLevel": {
+    "Value": "None",
+    "CanBeChanged": true,
+    "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+  },
+  "CanModifyAdditionalSettings": {
+    "Value": true,
+    "CanBeChanged": true,
+    "ManagedPropertyLogicalName": "canmodifyadditionalsettings"
+  },
+  "Settings": [],
+  "@odata.type": "Microsoft.Dynamics.CRM.IntegerAttributeMetadata"
+}

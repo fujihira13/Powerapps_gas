@@ -29,7 +29,7 @@ EXCEL_API = "shared_excelonlinebusiness"
 T006_FOLDER_ID = "01VTXCECE5BP476QXS7RFIAAAMC5QNGY6X"
 T006_TEMPLATE_ID = "01VTXCECFCHLCOP5KJYFG3SOSB36BFWFWD"
 T006_FOLDER_PATH = "/架空ログ証跡アプリ完成版検証-T006-20260925"
-T006_TEMPLATE_PATH = f"{T006_FOLDER_PATH}/evidence-template.xlsx"
+T006_TEMPLATE_PATH = f"{T006_FOLDER_PATH}/evidence-template-received-at-jst.xlsx"
 T006_BROWSER_DOCUMENTS_ROOT = (
     "https://fujimasa13-my.sharepoint.com/personal/"
     "fujimasa_fujimasa13_onmicrosoft_com/Documents"
@@ -157,7 +157,10 @@ def _excel_item_expression() -> str:
         ("LogFileName", "outputs('Compose_LogFileName')"),
         ("Environment", "outputs('Get_case')?['body/cr6cb_environment']"),
         ("Server", "outputs('Get_case')?['body/cr6cb_server']"),
-        ("RunNumber", "outputs('Get_case')?['body/cr6cb_runnumber']"),
+        (
+            "ReceivedAtJst",
+            "convertTimeZone(outputs('Get_case')?['body/createdon'],'UTC','Tokyo Standard Time','yyyy-MM-dd HH:mm:ss')",
+        ),
         (
             "TargetDate",
             "formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd')",
@@ -174,33 +177,34 @@ def _excel_item_expression() -> str:
     return "@" + expression
 
 
-def _log_validation_reason_expression() -> str:
+def _log_validation_reason_expression(*, include_run_number: bool = False) -> str:
     """Return a specific pre-copy rejection reason, or an empty string if valid."""
     lines = "outputs('Compose_LogLines')"
     line0 = f"string(coalesce({lines}?[0],''))"
     line1 = f"string(coalesce({lines}?[1],''))"
     line2 = f"string(coalesce({lines}?[2],''))"
-    line3 = f"string(coalesce({lines}?[3],''))"
-    run_number = "outputs('Get_case')?['body/cr6cb_runnumber']"
     server = "outputs('Get_case')?['body/cr6cb_server']"
     environment = "outputs('Get_case')?['body/cr6cb_environment']"
     target_date = "outputs('Get_case')?['body/cr6cb_targetdate']"
-    run_expected = f"concat('実行回: ',string({run_number}))"
     server_expected = f"concat('サーバー: ',{server})"
     environment_expected = f"concat('環境: ',{environment})"
     date_expected = f"concat('処理日: ',formatDateTime({target_date},'yyyy-MM-dd'))"
 
     reason = "''"
-    reason = (
-        f"if(not(equals({line3},{run_expected})),"
-        "'ログの実行回が件の実行回と一致しません。',"
-        f"{reason})"
-    )
-    reason = (
-        f"if(not(startsWith({line3},'実行回: ')),"
-        "'ログに実行回の識別情報がありません。',"
-        f"{reason})"
-    )
+    if include_run_number:
+        line3 = f"string(coalesce({lines}?[3],''))"
+        run_number = "outputs('Get_case')?['body/cr6cb_runnumber']"
+        run_expected = f"concat('実行回: ',string({run_number}))"
+        reason = (
+            f"if(not(equals({line3},{run_expected})),"
+            "'ログの実行回が件の実行回と一致しません。',"
+            f"{reason})"
+        )
+        reason = (
+            f"if(not(startsWith({line3},'実行回: ')),"
+            "'ログに実行回の識別情報がありません。',"
+            f"{reason})"
+        )
     reason = (
         f"if(not(equals({line2},{server_expected})),"
         "'ログのサーバーが件のサーバーと一致しません。',"
@@ -290,7 +294,9 @@ def _log_validation_reason_expression() -> str:
     return "@" + reason
 
 
-def _readback_expression(readback_action: str) -> str:
+def _readback_expression(
+    readback_action: str, *, include_run_number: bool = False
+) -> str:
     row = f"first(body('{readback_action}')?['value'])?"
     conditions = [
         f"equals(length(body('{readback_action}')?['value']),1)",
@@ -298,12 +304,21 @@ def _readback_expression(readback_action: str) -> str:
         f"equals({row}['LogFileName'],outputs('Compose_LogFileName'))",
         f"equals({row}['Environment'],outputs('Get_case')?['body/cr6cb_environment'])",
         f"equals({row}['Server'],outputs('Get_case')?['body/cr6cb_server'])",
-        f"equals(string({row}['RunNumber']),string(outputs('Get_case')?['body/cr6cb_runnumber']))",
         f"startsWith(string({row}['TargetDate']),formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd'))",
         f"equals(string({row}['ChunkIndex']),'1')",
         f"equals(string({row}['ChunkCount']),'1')",
         f"equals({row}['LogTextPart'],outputs('Compose_LogText'))",
     ]
+    if include_run_number:
+        conditions.insert(
+            5,
+            f"equals(string({row}['RunNumber']),string(outputs('Get_case')?['body/cr6cb_runnumber']))",
+        )
+    else:
+        conditions.insert(
+            5,
+            f"equals(formatDateTime({row}['ReceivedAtJst'],'yyyy-MM-dd HH:mm:ss'),convertTimeZone(outputs('Get_case')?['body/createdon'],'UTC','Tokyo Standard Time','yyyy-MM-dd HH:mm:ss'))",
+        )
     return "@and(" + ",".join(conditions) + ")"
 
 
@@ -462,7 +477,7 @@ def _normal_path_actions() -> dict[str, Any]:
             "table": "Evidence",
             "$filter": "@concat('CaseId eq ''',outputs('Compose_CaseId'),'''')",
             "$top": 2,
-            "$select": "CaseId,LogFileName,Environment,Server,RunNumber,TargetDate,ChunkIndex,ChunkCount,LogTextPart",
+            "$select": "CaseId,LogFileName,Environment,Server,ReceivedAtJst,TargetDate,ChunkIndex,ChunkCount,LogTextPart",
             "dateTimeFormat": "ISO 8601",
         },
         {"Delay_before_readback": ["Succeeded"]},
@@ -493,7 +508,7 @@ def _normal_path_actions() -> dict[str, Any]:
             # a best-effort cache-key variation, not proof that a cache is bypassed.
             # A retry result is still accepted only after full row verification.
             "$top": 3,
-            "$select": "CaseId,LogFileName,Environment,Server,RunNumber,TargetDate,ChunkIndex,ChunkCount,LogTextPart",
+            "$select": "CaseId,LogFileName,Environment,Server,ReceivedAtJst,TargetDate,ChunkIndex,ChunkCount,LogTextPart",
             "dateTimeFormat": "ISO 8601",
         },
         {"Delay_before_readback_retry": ["Succeeded"]},
@@ -656,7 +671,7 @@ def build_clientdata() -> dict[str, Any]:
                 {
                     "entityName": "cr6cb_evidencecases",
                     "recordId": "@outputs('Compose_CaseId')",
-                    "$select": "cr6cb_evidencecaseid,cr6cb_caselabel,cr6cb_environment,cr6cb_server,cr6cb_runnumber,cr6cb_targetdate,cr6cb_processingstatus",
+                    "$select": "cr6cb_evidencecaseid,cr6cb_caselabel,cr6cb_environment,cr6cb_server,cr6cb_targetdate,cr6cb_processingstatus,createdon",
                 },
                 {"Compose_CaseId": ["Succeeded"]},
                 retry_none=True,
@@ -807,7 +822,9 @@ def _excelurl_destination_branch_errors(actions: dict[str, Any]) -> list[str]:
     return errors
 
 
-def _excelurl_readback_gate_errors(actions: dict[str, Any]) -> list[str]:
+def _excelurl_readback_gate_errors(
+    actions: dict[str, Any], *, include_run_number: bool = False
+) -> list[str]:
     errors: list[str] = []
     expected_dependencies = {
         "Scope_Write_And_Verify": {"Copy_template": ["Succeeded"]},
@@ -872,13 +889,18 @@ def _excelurl_readback_gate_errors(actions: dict[str, Any]) -> list[str]:
     if not isinstance(retry_actions, dict):
         retry_actions = {}
     retry_match = retry_actions.get("Condition_Readback_Retry_Matches")
+    expected_columns = (
+        "CaseId,LogFileName,Environment,Server,RunNumber,TargetDate,ChunkIndex,ChunkCount,LogTextPart"
+        if include_run_number
+        else "CaseId,LogFileName,Environment,Server,ReceivedAtJst,TargetDate,ChunkIndex,ChunkCount,LogTextPart"
+    )
     expected_readback_parameters = {
         "source": "me",
         "drive": "@first(body('Filter_active_destinations'))?['cr6cb_driveid']",
         "file": "@outputs('Copy_template')?['body/Id']",
         "table": "Evidence",
         "$filter": "@concat('CaseId eq ''',outputs('Compose_CaseId'),'''')",
-        "$select": "CaseId,LogFileName,Environment,Server,RunNumber,TargetDate,ChunkIndex,ChunkCount,LogTextPart",
+        "$select": expected_columns,
         "dateTimeFormat": "ISO 8601",
     }
     for readback_name, page_size in (
@@ -916,7 +938,12 @@ def _excelurl_readback_gate_errors(actions: dict[str, Any]) -> list[str]:
             errors.append(f"Excel URL candidate is missing {condition_name} in its readback branch")
             continue
         if condition.get("expression") != {
-            "equals": [_readback_expression(readback_name), True]
+            "equals": [
+                _readback_expression(
+                    readback_name, include_run_number=include_run_number
+                ),
+                True,
+            ]
         }:
             errors.append(f"{condition_name} must require the complete matching readback")
         if condition.get("runAfter") != expected_run_after:
@@ -1027,6 +1054,70 @@ MQ_OFFICE_SCRIPT_IDS = {
     "writer": "__SELECT_MQ_COMPARISON_WRITER_SCRIPT__",
     "readback": "__SELECT_MQ_COMPARISON_READBACK_SCRIPT__",
 }
+MQ_SCRIPT_ACTION_NAMES = {
+    "reader": "Run_MQ_Input_Validation",
+    "writer": "Run_MQ_Result_Write_MQ",
+    "readback": "Run_MQ_Result_Readback_MQ",
+}
+MQ_OFFICE_SCRIPT_PREFIX = (
+    "ms-officescript%3A%2F%2Fonedrive_business_itemlink%2F"
+)
+
+
+def _normalize_mq_script_ids(script_ids: dict[str, str] | None) -> dict[str, str]:
+    expected = set(MQ_OFFICE_SCRIPT_IDS)
+    ids = dict(MQ_OFFICE_SCRIPT_IDS) if script_ids is None else dict(script_ids)
+    if set(ids) != expected:
+        raise ValueError("exactly the reader, writer, and readback script IDs are required")
+    values = list(ids.values())
+    if len(set(values)) != len(values):
+        raise ValueError("the three Office Script IDs must be distinct")
+    for role, script_id in ids.items():
+        if not isinstance(script_id, str) or not script_id:
+            raise ValueError(f"the {role} Office Script ID is missing")
+        if script_id.startswith("__SELECT_MQ_"):
+            if script_id != MQ_OFFICE_SCRIPT_IDS[role]:
+                raise ValueError(f"the {role} Office Script ID placeholder is invalid")
+        elif not script_id.startswith(MQ_OFFICE_SCRIPT_PREFIX):
+            raise ValueError(f"the {role} Office Script ID has an unsupported format")
+    return ids
+
+
+def load_mq_script_ids(source_path: Path) -> dict[str, str]:
+    """Read only the three named Office Script IDs from a saved flow GET."""
+    try:
+        source = json.loads(source_path.read_text(encoding="utf-8-sig"))
+        if not isinstance(source, dict):
+            raise ValueError("saved flow GET root is not an object")
+        if source.get("clientdataiscompressed") is True:
+            raise ValueError("saved flow clientdata is compressed")
+        clientdata = source["clientdata"]
+        clientdata = json.loads(clientdata) if isinstance(clientdata, str) else clientdata
+        actions = clientdata["properties"]["definition"]["actions"]
+    except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise ValueError("saved flow GET does not contain readable clientdata") from exc
+
+    script_ids: dict[str, str] = {}
+    for role, action_name in MQ_SCRIPT_ACTION_NAMES.items():
+        matches = [
+            action
+            for name, action in _all_actions(actions)
+            if name == action_name
+        ]
+        if len(matches) != 1:
+            raise ValueError(f"saved flow must contain exactly one {action_name} action")
+        action = matches[0]
+        inputs = action.get("inputs", {})
+        host = inputs.get("host", {}) if isinstance(inputs, dict) else {}
+        parameters = inputs.get("parameters", {}) if isinstance(inputs, dict) else {}
+        if (
+            action.get("type") != "OpenApiConnection"
+            or host.get("operationId") != "RunScriptProd"
+            or not isinstance(parameters, dict)
+        ):
+            raise ValueError(f"saved flow action {action_name} is not an Office Script action")
+        script_ids[role] = parameters.get("scriptId")
+    return _normalize_mq_script_ids(script_ids)
 
 
 def _rename_action_subtree(action: dict[str, Any], suffix: str) -> dict[str, Any]:
@@ -1171,8 +1262,13 @@ def _mq_incomplete_diagnostic_item_expression() -> str:
     return "@" + expression
 
 
-def build_mq_candidate(clientdata: dict[str, Any] | None = None) -> dict[str, Any]:
+def build_mq_candidate(
+    clientdata: dict[str, Any] | None = None,
+    *,
+    script_ids: dict[str, str] | None = None,
+) -> dict[str, Any]:
     """Return an offline MQ branch while leaving the one-note path intact."""
+    selected_script_ids = _normalize_mq_script_ids(script_ids)
     candidate = copy.deepcopy(build_excelurl_candidate() if clientdata is None else clientdata)
     definition_actions = candidate["properties"]["definition"]["actions"]
     start_actions = definition_actions["Condition_Start_Ready"]["actions"]
@@ -1218,7 +1314,7 @@ def build_mq_candidate(clientdata: dict[str, Any] | None = None) -> dict[str, An
     reader_action = _mq_script_action(
         "Run_MQ_Input_Validation",
         file_expression="@outputs('Stage_MQ_Input')?['body/Id']",
-        script_placeholder=MQ_OFFICE_SCRIPT_IDS["reader"],
+        script_placeholder=selected_script_ids["reader"],
         script_parameters={
             "ScriptParameters/logText": "@outputs('Compose_LogText_MQ')",
         },
@@ -1254,7 +1350,7 @@ def build_mq_candidate(clientdata: dict[str, Any] | None = None) -> dict[str, An
     writer_action = _mq_script_action(
         "Run_MQ_Result_Write_MQ",
         file_expression="@outputs('Copy_template_MQ')?['body/Id']",
-        script_placeholder=MQ_OFFICE_SCRIPT_IDS["writer"],
+        script_placeholder=selected_script_ids["writer"],
         script_parameters={
             "ScriptParameters/validationJson": "@string(outputs('Compose_MQ_Input_Result'))",
             "ScriptParameters/caseId": "@outputs('Compose_CaseId')",
@@ -1275,7 +1371,7 @@ def build_mq_candidate(clientdata: dict[str, Any] | None = None) -> dict[str, An
     result_read_action = _mq_script_action(
         "Run_MQ_Result_Readback_MQ",
         file_expression="@outputs('Copy_template_MQ')?['body/Id']",
-        script_placeholder=MQ_OFFICE_SCRIPT_IDS["readback"],
+        script_placeholder=selected_script_ids["readback"],
         script_parameters={
             "ScriptParameters/validationJson": "@string(outputs('Compose_MQ_Input_Result'))",
             "ScriptParameters/caseId": "@outputs('Compose_CaseId')",
@@ -1692,16 +1788,19 @@ def _mq_action_depth_errors(actions: dict[str, Any]) -> list[str]:
     return errors
 
 
-def validate_mq_candidate(clientdata: dict[str, Any]) -> list[str]:
-    """Check the local MQ branch while explicitly permitting known script IDs."""
+def validate_mq_candidate(
+    clientdata: dict[str, Any], *, expected_script_ids: dict[str, str] | None = None
+) -> list[str]:
+    """Check the MQ branch against explicit placeholders or selected live IDs."""
     errors: list[str] = []
+    selected_script_ids = _normalize_mq_script_ids(expected_script_ids)
     sanitized = copy.deepcopy(clientdata)
     for _, action in _all_actions(sanitized["properties"]["definition"]["actions"]):
         inputs = action.get("inputs", {})
         parameters = inputs.get("parameters", {}) if isinstance(inputs, dict) else {}
         if isinstance(parameters, dict):
             script_id = parameters.get("scriptId")
-            if script_id in MQ_OFFICE_SCRIPT_IDS.values():
+            if script_id in selected_script_ids.values():
                 parameters["scriptId"] = "ms-officescript%3A%2F%2Fonedrive_business_itemlink%2FLOCAL_CANDIDATE"
     errors.extend(validate_clientdata(sanitized))
     actions = clientdata.get("properties", {}).get("definition", {}).get("actions", {})
@@ -1740,7 +1839,7 @@ def validate_mq_candidate(clientdata: dict[str, Any]) -> list[str]:
     if (
         not isinstance(reader, dict)
         or reader.get("inputs", {}).get("host", {}).get("operationId") != "RunScriptProd"
-        or reader.get("inputs", {}).get("parameters", {}).get("scriptId") != MQ_OFFICE_SCRIPT_IDS["reader"]
+        or reader.get("inputs", {}).get("parameters", {}).get("scriptId") != selected_script_ids["reader"]
         or reader.get("inputs", {}).get("retryPolicy") != {"type": "none"}
     ):
         errors.append("MQ input validation must use the selected Office Script without automatic retry")
@@ -1790,8 +1889,8 @@ def validate_mq_candidate(clientdata: dict[str, Any]) -> list[str]:
         or not isinstance(result_reader, dict)
         or writer.get("inputs", {}).get("host", {}).get("operationId") != "RunScriptProd"
         or result_reader.get("inputs", {}).get("host", {}).get("operationId") != "RunScriptProd"
-        or writer.get("inputs", {}).get("parameters", {}).get("scriptId") != MQ_OFFICE_SCRIPT_IDS["writer"]
-        or result_reader.get("inputs", {}).get("parameters", {}).get("scriptId") != MQ_OFFICE_SCRIPT_IDS["readback"]
+        or writer.get("inputs", {}).get("parameters", {}).get("scriptId") != selected_script_ids["writer"]
+        or result_reader.get("inputs", {}).get("parameters", {}).get("scriptId") != selected_script_ids["readback"]
         or writer.get("inputs", {}).get("retryPolicy") != {"type": "none"}
         or result_reader.get("inputs", {}).get("retryPolicy") != {"type": "none"}
     ):
@@ -1933,16 +2032,25 @@ def validate_mq_candidate(clientdata: dict[str, Any]) -> list[str]:
                 errors.append("MQ external write/script actions must disable automatic retry")
                 break
     serialized = json.dumps(clientdata, ensure_ascii=False)
-    expected_placeholders = set(MQ_OFFICE_SCRIPT_IDS.values())
-    actual_placeholders = {value for value in MQ_OFFICE_SCRIPT_IDS.values() if value in serialized}
-    if actual_placeholders != expected_placeholders:
-        errors.append("MQ local candidate must keep all three unresolved Office Script IDs explicit")
+    if expected_script_ids is None:
+        expected_placeholders = set(MQ_OFFICE_SCRIPT_IDS.values())
+        actual_placeholders = {
+            value for value in MQ_OFFICE_SCRIPT_IDS.values() if value in serialized
+        }
+        if actual_placeholders != expected_placeholders:
+            errors.append("MQ test candidate must keep all three unresolved Office Script IDs explicit")
+    elif any(value in serialized for value in MQ_OFFICE_SCRIPT_IDS.values()):
+        errors.append("generated MQ candidate must not contain unresolved Office Script ID placeholders")
     return errors
 
 
-def write_mq_candidate() -> Path:
-    candidate = build_mq_candidate()
-    errors = validate_mq_candidate(candidate)
+def write_mq_candidate(script_id_source: Path) -> Path:
+    source = script_id_source
+    if not source.is_absolute():
+        source = HERE.parent.parent / source
+    selected_script_ids = load_mq_script_ids(source)
+    candidate = build_mq_candidate(script_ids=selected_script_ids)
+    errors = validate_mq_candidate(candidate, expected_script_ids=selected_script_ids)
     if errors:
         raise ValueError("MQ local candidate failed static validation: " + "; ".join(errors))
     output = HERE / "flow-definition.mq-local-candidate.json"
@@ -2019,7 +2127,23 @@ def validate_excelurl_candidate(clientdata: dict[str, Any]) -> list[str]:
     actions = clientdata["properties"]["definition"]["actions"]
     errors.extend(_excelurl_copy_destination_errors(actions))
     errors.extend(_excelurl_destination_branch_errors(actions))
-    errors.extend(_excelurl_readback_gate_errors(actions))
+    get_case_select = (
+        clientdata.get("properties", {})
+        .get("definition", {})
+        .get("actions", {})
+        .get("Get_case", {})
+        .get("inputs", {})
+        .get("parameters", {})
+        .get("$select", "")
+    )
+    legacy_run_number = (
+        "cr6cb_runnumber" in get_case_select and "createdon" not in get_case_select
+    )
+    errors.extend(
+        _excelurl_readback_gate_errors(
+            actions, include_run_number=legacy_run_number
+        )
+    )
     errors.extend(_side_effect_failure_path_errors(actions))
     expected_successes = (
         ("Condition_Readback_Matches", "Compose_ExcelUrl", "Update_case_success"),
@@ -2120,7 +2244,8 @@ def build_status() -> dict[str, Any]:
             "Power Apps (V2) caseId input",
             "Read one case and require processingstatus=開始受付済み",
             "Require exactly one attached document note",
-            "Compare log date, environment, server, and run number with the case",
+            "Compare log date, environment, and server with the case",
+            "Write Dataverse createdon as ReceivedAtJst in Tokyo local time with second precision",
             "Require exactly one active destination mapping matching environment/server and the T006 folder",
             "Copy the T006 workbook to a fixed caseId filename with overwrite=false",
             "Replace the template Evidence row, read it back, then mark 転記済み / 全文一致",
@@ -2241,12 +2366,22 @@ def validate_clientdata(clientdata: dict[str, Any]) -> list[str]:
     get_case = actions.get("Get_case", {})
     get_host = get_case.get("inputs", {}).get("host", {})
     get_parameters = get_case.get("inputs", {}).get("parameters", {})
+    selected_case_columns = get_parameters.get("$select", "")
+    legacy_run_number = (
+        "cr6cb_runnumber" in selected_case_columns
+        and "createdon" not in selected_case_columns
+    )
     if get_host.get("operationId") != "GetItem":
         errors.append("Get_case must use Dataverse GetItem")
     if get_parameters.get("entityName") != "cr6cb_evidencecases":
         errors.append("Get_case must target the case entity set")
     if get_parameters.get("recordId") != "@outputs('Compose_CaseId')":
         errors.append("Get_case must use the composed caseId")
+    if not legacy_run_number:
+        if "createdon" not in selected_case_columns:
+            errors.append("Get_case must select createdon for the ReceivedAtJst evidence field")
+        if "cr6cb_runnumber" in selected_case_columns:
+            errors.append("new flow must not depend on the optional run-number column")
     start_condition = actions.get("Condition_Start_Ready", {})
     if start_condition.get("type") != "If" or "開始受付済み" not in json.dumps(start_condition, ensure_ascii=False):
         errors.append("flow must guard the initial transfer on 開始受付済み")
@@ -2254,7 +2389,8 @@ def validate_clientdata(clientdata: dict[str, Any]) -> list[str]:
     validation_reason = _find_action(actions, "Compose_LogValidationReason")
     if (
         validation_reason is None
-        or validation_reason.get("inputs") != _log_validation_reason_expression()
+        or validation_reason.get("inputs")
+        != _log_validation_reason_expression(include_run_number=legacy_run_number)
         or validation_reason.get("runAfter") != {"Compose_LogLines": ["Succeeded"]}
     ):
         errors.append("log validation must compute a specific reason after splitting the log")
@@ -2392,7 +2528,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mq-candidate",
         action="store_true",
-        help="write a separate local MQ comparison candidate with unresolved Office Script IDs",
+        help="write a separate local MQ comparison candidate using IDs from a saved flow GET",
+    )
+    parser.add_argument(
+        "--mq-script-id-source",
+        type=Path,
+        help="saved Dataverse flow GET JSON used only to copy the three existing Office Script IDs",
     )
     parser.add_argument(
         "--excelurl-candidate",
@@ -2407,14 +2548,18 @@ if __name__ == "__main__":
     if args.mq_candidate and args.excelurl_candidate:
         parser.error("--mq-candidate and --excelurl-candidate cannot be combined")
     if args.mq_candidate:
+        if args.mq_script_id_source is None:
+            parser.error("--mq-candidate requires --mq-script-id-source")
         if args.browser_documents_root:
             parser.error("--browser-documents-root cannot be used with --mq-candidate")
-        output = write_mq_candidate()
+        output = write_mq_candidate(args.mq_script_id_source)
         print(
             "Generated and statically validated separate local MQ candidate "
-            f"{output.name}; Office Script IDs remain placeholders; no cloud calls made."
+            f"{output.name} from the saved flow's three Office Script IDs; no cloud calls made."
         )
     elif args.excelurl_candidate:
+        if args.mq_script_id_source is not None:
+            parser.error("--mq-script-id-source requires --mq-candidate")
         output = write_excelurl_candidate(
             args.browser_documents_root or T006_BROWSER_DOCUMENTS_ROOT
         )
@@ -2425,5 +2570,7 @@ if __name__ == "__main__":
     else:
         if args.browser_documents_root:
             parser.error("--browser-documents-root requires --excelurl-candidate")
+        if args.mq_script_id_source is not None:
+            parser.error("--mq-script-id-source requires --mq-candidate")
         write_artifacts()
         print("Generated and statically validated local WDL candidate; no cloud calls made.")
