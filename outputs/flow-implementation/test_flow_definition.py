@@ -41,7 +41,400 @@ def walk_actions(actions):
             yield from walk_actions(else_actions)
 
 
+def walk_action_paths(actions, path=()):
+    for name, action in actions.items():
+        current = path + (name,)
+        yield current, action
+        nested = action.get("actions", {})
+        if isinstance(nested, dict):
+            yield from walk_action_paths(nested, current)
+        else_actions = action.get("else", {}).get("actions", {})
+        if isinstance(else_actions, dict):
+            yield from walk_action_paths(else_actions, current)
+
+
 class FlowDefinitionTests(unittest.TestCase):
+    def test_mq_candidate_keeps_legacy_case_id_single_note_and_evidence_flow(self):
+        from build_flow_definition import build_mq_candidate, validate_mq_candidate
+
+        candidate = build_mq_candidate()
+        actions = candidate["properties"]["definition"]["actions"]
+        trigger = candidate["properties"]["definition"]["triggers"]["manual"]
+        self.assertEqual(trigger["inputs"]["schema"]["required"], ["text"])
+        self.assertEqual(trigger["inputs"]["schema"]["properties"]["text"]["title"], "caseId")
+        self.assertIn("Condition_Two_Attachments", json.dumps(actions))
+        self.assertNotIn("Condition_MQ_Mode", json.dumps(actions))
+        legacy_candidate = build_excelurl_candidate()
+        self.assertIn("Condition_One_Note", json.dumps(legacy_candidate))
+        self.assertIn("table\": \"Evidence\"", json.dumps(actions))
+        legacy_branch = find_action(actions, "Condition_One_Note")["actions"]
+        legacy_branch_before_mq = find_action(
+            legacy_candidate["properties"]["definition"]["actions"], "Condition_One_Note"
+        )["actions"]
+        self.assertEqual(legacy_branch, legacy_branch_before_mq)
+        self.assertNotIn("Run_MQ_Input_Validation", json.dumps(legacy_branch))
+        self.assertIn("Replace_template_row", json.dumps(legacy_branch))
+        self.assertEqual(validate_mq_candidate(candidate), [])
+
+    def test_every_mq_branch_expression_resolves_to_mq_or_shared_ancestor_actions(self):
+        from build_flow_definition import build_mq_candidate, validate_mq_candidate
+
+        candidate = build_mq_candidate()
+        actions = candidate["properties"]["definition"]["actions"]
+        destination = find_action(actions, "Condition_One_Destination_MQ")
+        destination_expression = json.dumps(destination["expression"])
+        self.assertIn("Filter_active_destinations_MQ", destination_expression)
+        self.assertNotIn("Filter_active_destinations'", destination_expression)
+        condition_name = "Condition_Readback_Matches_MQ"
+        expression = json.dumps(find_action(actions, condition_name)["expression"])
+        with self.subTest(condition=condition_name):
+            self.assertIn("Compose_LogFileName_MQ", expression)
+            self.assertIn("Compose_LogText_MQ", expression)
+            self.assertNotIn("Compose_LogFileName'", expression)
+            self.assertNotIn("Compose_LogText'", expression)
+        self.assertEqual(validate_mq_candidate(candidate), [])
+
+        # The validator scans nested MQ expressions, not just destination gates.
+        writer = find_action(actions, "Run_MQ_Result_Write_MQ")
+        writer["inputs"]["parameters"]["drive"] = "@outputs('Missing_MQ_Drive_Action')"
+        errors = validate_mq_candidate(candidate)
+        self.assertTrue(
+            any(
+                "unavailable or non-MQ actions" in error
+                and "Missing_MQ_Drive_Action" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_mq_candidate_validates_one_txt_and_one_xlsx_then_reads_batch_workbook(self):
+        from build_flow_definition import build_mq_candidate
+
+        actions = build_mq_candidate()["properties"]["definition"]["actions"]
+        role_gate = find_action(actions, "Condition_MQ_Attachment_Roles")
+        log_filter = find_action(actions, "Filter_MQ_Logs")
+        book_filter = find_action(actions, "Filter_MQ_Books")
+        stage = find_action(actions, "Stage_MQ_Input")
+        reader = find_action(actions, "Run_MQ_Input_Validation")
+        self.assertIsNotNone(role_gate)
+        serialized = json.dumps(actions)
+        self.assertIn("equals(length(body('Filter_MQ_Logs')),1)", json.dumps(role_gate))
+        self.assertIn("equals(length(body('Filter_MQ_Books')),1)", json.dumps(role_gate))
+        self.assertNotIn("body('Filter_MQ_Logs')?['value']", serialized)
+        self.assertNotIn("body('Filter_MQ_Books')?['value']", serialized)
+        self.assertIn(".txt", log_filter["inputs"]["where"])
+        self.assertIn(".xlsx", book_filter["inputs"]["where"])
+        self.assertIn("first(body('Filter_MQ_Logs'))?['documentbody']", serialized)
+        self.assertIn("first(body('Filter_MQ_Logs'))?['filename']", serialized)
+        self.assertEqual(stage["inputs"]["host"]["operationId"], "CreateFile")
+        self.assertIn("first(body('Filter_MQ_Books'))?['documentbody']", json.dumps(stage))
+        self.assertEqual(stage["inputs"]["retryPolicy"], {"type": "none"})
+        self.assertEqual(reader["inputs"]["host"]["operationId"], "RunScriptProd")
+        self.assertIn("__SELECT_MQ_BATCH_READER_SCRIPT__", reader["inputs"]["parameters"]["scriptId"])
+        validation_gate = find_action(actions, "Condition_MQ_Batch_Valid")
+        gate_expression = json.dumps(validation_gate["expression"])
+        self.assertIn("mq-id-result.v1", gate_expression)
+        self.assertIn("comparison_available", gate_expression)
+        self.assertIn("comparison_ready", gate_expression)
+        self.assertNotIn("stop_processing", gate_expression)
+        incomplete_gate = find_action(actions, "Condition_MQ_Log_Incomplete")
+        self.assertIn("log_incomplete", json.dumps(incomplete_gate["expression"]))
+        self.assertIn("comparison_available", json.dumps(incomplete_gate["expression"]))
+        self.assertIn("Update_case_mq_incomplete_diagnostic", incomplete_gate["actions"])
+        self.assertIn("Update_case_stop_mq_input_invalid", incomplete_gate["else"]["actions"])
+        self.assertIn("result_text", find_action(actions, "Update_case_mq_incomplete_diagnostic")["inputs"]["parameters"]["item"])
+
+    def test_mq_result_write_and_independent_readback_gate_success(self):
+        from build_flow_definition import build_mq_candidate
+
+        actions = build_mq_candidate()["properties"]["definition"]["actions"]
+        scope = find_action(actions, "Scope_Write_And_Verify_MQ")
+        self.assertEqual(scope["type"], "Scope")
+        scope_actions = scope["actions"]
+        self.assertIn("Replace_template_row_MQ", scope_actions)
+        self.assertIn("Run_MQ_Result_Write_MQ", scope_actions)
+        self.assertIn("Run_MQ_Result_Readback_MQ", scope_actions)
+        self.assertIn("Read_back_evidence_MQ", scope_actions)
+        self.assertEqual(
+            scope_actions["Run_MQ_Result_Write_MQ"]["runAfter"],
+            {"Replace_template_row_MQ": ["Succeeded"]},
+        )
+        self.assertEqual(
+            scope_actions["Run_MQ_Result_Readback_MQ"]["runAfter"],
+            {"Compose_MQ_Result_Write_Gate_MQ": ["Succeeded"]},
+        )
+        self.assertEqual(
+            find_action(actions, "Update_case_postcopy_unknown_MQ")["runAfter"],
+            {"Scope_Write_And_Verify_MQ": ["Failed", "TimedOut"]},
+        )
+        readback_match = find_action(actions, "Condition_Readback_Matches_MQ")
+        self.assertIn("Compose_MQ_Result_Readback_MQ", json.dumps(readback_match))
+
+        expected_fields = (
+            "cr6cb_mqterminalstatus",
+            "cr6cb_mqexpectedcount",
+            "cr6cb_mqloggedcount",
+            "cr6cb_mqmissingcount",
+            "cr6cb_mqmissingids",
+            "cr6cb_mqcomparisonstatus",
+            "cr6cb_mqresulttext",
+        )
+        success_name = "Update_case_success_MQ"
+        item = find_action(actions, success_name)["inputs"]["parameters"]["item"]
+        for field in expected_fields:
+            self.assertIn(field, item)
+        field_writers = []
+        for action_name, action in walk_actions(actions):
+            action_inputs = action.get("inputs", {})
+            if not isinstance(action_inputs, dict) or action_inputs.get("host", {}).get("operationId") != "UpdateOnlyRecord":
+                continue
+            item = action_inputs.get("parameters", {}).get("item", "")
+            if any(field in item for field in expected_fields):
+                field_writers.append(action_name)
+        self.assertEqual(
+            set(field_writers),
+            {"Update_case_success_MQ", "Update_case_mq_incomplete_diagnostic"},
+        )
+        self.assertIn("ScriptParameters/caseId", scope_actions["Run_MQ_Result_Write_MQ"]["inputs"]["parameters"])
+        self.assertIn("ScriptParameters/caseId", scope_actions["Run_MQ_Result_Readback_MQ"]["inputs"]["parameters"])
+
+    def test_mq_writer_result_must_be_ok_before_readback_and_generic_unknown_preserves_reason(self):
+        from build_flow_definition import build_mq_candidate, validate_mq_candidate
+
+        candidate = build_mq_candidate()
+        actions = candidate["properties"]["definition"]["actions"]
+        scope_actions = find_action(actions, "Scope_Write_And_Verify_MQ")["actions"]
+        writer_result = scope_actions["Compose_MQ_Result_Write_MQ"]
+        writer_gate = scope_actions["Compose_MQ_Result_Write_Gate_MQ"]
+        result_readback = scope_actions["Run_MQ_Result_Readback_MQ"]
+        self.assertEqual(
+            writer_result["runAfter"],
+            {"Run_MQ_Result_Write_MQ": ["Succeeded"]},
+        )
+        self.assertIn("body('Run_MQ_Result_Write_MQ')?['result']", writer_result["inputs"])
+        self.assertIn("outputs('Compose_MQ_Result_Write_MQ')?['ok']", writer_gate["inputs"])
+        self.assertIn("div(1,if(", writer_gate["inputs"])
+        self.assertNotIn("div(1,0)", writer_gate["inputs"])
+        self.assertEqual(
+            writer_gate["runAfter"],
+            {"Compose_MQ_Result_Write_MQ": ["Succeeded"]},
+        )
+        self.assertEqual(
+            result_readback["runAfter"],
+            {"Compose_MQ_Result_Write_Gate_MQ": ["Succeeded"]},
+        )
+
+        postcopy_unknown = find_action(actions, "Update_case_postcopy_unknown_MQ")
+        postcopy_item = postcopy_unknown["inputs"]["parameters"]["item"]
+        self.assertIn("outputs('Compose_MQ_Result_Write_MQ')?['error']", postcopy_item)
+        self.assertIn("actions('Compose_MQ_Result_Write_MQ')?['status']", postcopy_item)
+        validation_unknown = find_action(actions, "Update_case_mq_validation_condition_unknown")
+        validation_item = validation_unknown["inputs"]["parameters"]["item"]
+        self.assertNotIn("cr6cb_failurereason", validation_item)
+        self.assertIn("cr6cb_processingstatus','結果不明'", validation_item)
+        self.assertNotIn("cr6cb_excelcheckstatus", validation_item)
+        self.assertEqual(validate_mq_candidate(candidate), [])
+
+        writer_gate["inputs"] = "@true"
+        self.assertTrue(
+            any("writer result must gate readback" in error for error in validate_mq_candidate(candidate))
+        )
+
+        candidate = build_mq_candidate()
+        validation_unknown = find_action(
+            candidate["properties"]["definition"]["actions"],
+            "Update_case_mq_validation_condition_unknown",
+        )
+        validation_unknown["inputs"]["parameters"]["item"] += "cr6cb_failurereason"
+        self.assertTrue(
+            any("broad MQ unknown fallback must preserve an existing failure reason" in error
+                for error in validate_mq_candidate(candidate))
+        )
+
+        candidate = build_mq_candidate()
+        validation_unknown = find_action(
+            candidate["properties"]["definition"]["actions"],
+            "Update_case_mq_validation_condition_unknown",
+        )
+        validation_unknown["inputs"]["parameters"]["item"] += "cr6cb_excelcheckstatus"
+        self.assertTrue(
+            any("broad MQ unknown fallback must update processing status only" in error
+                for error in validate_mq_candidate(candidate))
+        )
+
+    def test_mq_readback_retry_is_flattened_without_losing_unknown_handlers(self):
+        from build_flow_definition import build_mq_candidate, validate_mq_candidate
+
+        candidate = build_mq_candidate()
+        actions = candidate["properties"]["definition"]["actions"]
+        scope = find_action(actions, "Scope_Write_And_Verify_MQ")
+        scope_actions = scope["actions"]
+        self.assertNotIn("Condition_Readback_Is_Empty_MQ", scope_actions)
+        self.assertNotIn("Condition_Readback_Matches_MQ", scope_actions)
+        self.assertNotIn("Condition_Readback_Retry_Matches_MQ", scope_actions)
+        self.assertEqual(
+            scope_actions["Read_back_evidence_MQ"]["runAfter"],
+            {"Delay_before_readback_MQ": ["Succeeded"]},
+        )
+        self.assertEqual(
+            scope_actions["Delay_before_readback_retry_MQ"]["runAfter"],
+            {"Read_back_evidence_MQ": ["Succeeded"]},
+        )
+        self.assertEqual(
+            scope_actions["Read_back_evidence_retry_MQ"]["runAfter"],
+            {"Delay_before_readback_retry_MQ": ["Succeeded"]},
+        )
+        readback_gate = find_action(actions, "Condition_Readback_Matches_MQ")
+        self.assertEqual(
+            readback_gate["runAfter"],
+            {"Scope_Write_And_Verify_MQ": ["Succeeded"]},
+        )
+        match_expression = readback_gate["expression"]["equals"][0]
+        self.assertIn(
+            "or(equals(length(body('Read_back_evidence_MQ')?['value']),0),and(",
+            match_expression,
+        )
+        self.assertIn(
+            "length(body('Read_back_evidence_retry_MQ')?['value']),1",
+            match_expression,
+        )
+        self.assertIn("Compose_MQ_Result_Readback_MQ", match_expression)
+        self.assertIn("Compose_LogFileName_MQ", match_expression)
+        self.assertIn("Compose_LogText_MQ", match_expression)
+        self.assertIn("Update_case_success_MQ", readback_gate["actions"])
+        self.assertIn(
+            "Update_case_readback_unknown_MQ",
+            readback_gate["else"]["actions"],
+        )
+
+        validation_gate = find_action(actions, "Condition_MQ_Batch_Valid")
+        self.assertEqual(
+            validation_gate["actions"]["Update_case_readback_condition_unknown_MQ"]["runAfter"],
+            {"Condition_Readback_Matches_MQ": ["Failed", "TimedOut"]},
+        )
+        self.assertEqual(
+            find_action(actions, "Update_case_postcopy_unknown_MQ")["runAfter"],
+            {"Scope_Write_And_Verify_MQ": ["Failed", "TimedOut"]},
+        )
+
+        mq_paths = [
+            path
+            for path, _ in walk_action_paths(actions)
+            if "Condition_Two_Attachments" in path
+        ]
+        self.assertLessEqual(max(len(path) - 1 for path in mq_paths), 8)
+        for target in (
+            "Delay_before_readback_retry_MQ",
+            "Read_back_evidence_retry_MQ",
+            "Condition_Readback_Matches_MQ",
+        ):
+            path = next(path for path in mq_paths if path[-1] == target)
+            with self.subTest(action=target):
+                expected_depth = 7 if target == "Condition_Readback_Matches_MQ" else 8
+                self.assertEqual(len(path) - 1, expected_depth)
+        self.assertEqual(validate_mq_candidate(candidate), [])
+
+    def test_log_incomplete_saves_only_guarded_provisional_columns_without_report_or_link(self):
+        from build_flow_definition import build_mq_candidate, validate_mq_candidate
+
+        actions = build_mq_candidate()["properties"]["definition"]["actions"]
+        batch_gate = find_action(actions, "Condition_MQ_Batch_Valid")
+        incomplete_gate = find_action(actions, "Condition_MQ_Log_Incomplete")
+        diagnostic = find_action(actions, "Update_case_mq_incomplete_diagnostic")
+        item = diagnostic["inputs"]["parameters"]["item"]
+        expected_fields = (
+            "cr6cb_mqterminalstatus",
+            "cr6cb_mqexpectedcount",
+            "cr6cb_mqloggedcount",
+            "cr6cb_mqmissingcount",
+            "cr6cb_mqmissingids",
+            "cr6cb_mqcomparisonstatus",
+            "cr6cb_mqresulttext",
+        )
+
+        self.assertIn("Condition_MQ_Log_Incomplete", batch_gate["else"]["actions"])
+        self.assertIn("end_marker_present", json.dumps(incomplete_gate["expression"]))
+        self.assertIn("'なし'", item)
+        self.assertIn("'要確認'", item)
+        self.assertIn("cr6cb_processingstatus','停止'", item)
+        for field in expected_fields:
+            with self.subTest(field=field):
+                self.assertIn(field, item)
+        branch = json.dumps(incomplete_gate["actions"], ensure_ascii=False)
+        self.assertNotIn("Copy_template_MQ", branch)
+        self.assertNotIn("Run_MQ_Result_Write_MQ", branch)
+        self.assertNotIn("cr6cb_excelurl", branch)
+        self.assertEqual(diagnostic["inputs"]["retryPolicy"], {"type": "none"})
+        self.assertEqual(validate_mq_candidate(build_mq_candidate()), [])
+
+    def test_mq_scripts_enforce_contract_and_preserve_result_workbook_evidence(self):
+        scripts = Path(__file__).parent / "office-scripts"
+        reader = (scripts / "read_validate_batch_input.ts").read_text(encoding="utf-8")
+        writer = (scripts / "write_mq_comparison.ts").read_text(encoding="utf-8")
+        readback = (scripts / "readback_mq_comparison.ts").read_text(encoding="utf-8")
+        for expected in ("Batch_Input", "MQ_ID", "MQ_BOX_ID=", "ALL SUCCESS", "MQ-[0-9]{4}"):
+            self.assertIn(expected, reader)
+        self.assertIn("MQ_Comparison", writer)
+        self.assertIn("MQ_Comparison", readback)
+        self.assertIn('workbook.getWorksheet("証跡")', writer)
+        self.assertIn('workbook.getWorksheet("証跡")', readback)
+        self.assertIn('workbook.getWorksheet("MQ_Comparison")', writer)
+        self.assertIn('workbook.getWorksheet("MQ_Comparison")', readback)
+        self.assertNotIn('getName() === "Evidence"', writer)
+        self.assertNotIn('getName() === "Evidence"', readback)
+        self.assertNotIn("worksheets.find(", readback)
+        self.assertNotIn("worksheets.some(", writer)
+        self.assertNotIn("worksheets.some(", readback)
+        self.assertNotIn("getTables().filter(", readback)
+        self.assertIn('reportSheet.getTable("MQ_ComparisonTable")', readback)
+        self.assertIn("証跡 worksheet is missing", writer)
+        self.assertIn("証跡 or MQ_Comparison worksheet is missing", readback)
+        self.assertIn('table.setName("MQ_ComparisonTable")', writer)
+        self.assertIn("`${mqId}\\t${rowResult(input, mqId)}`", writer)
+        self.assertIn("`${mqId}\\t${rowResult(input, mqId)}`", readback)
+        self.assertIn('value.status !== "comparison_ready"', writer)
+        self.assertIn('value.status !== "comparison_ready"', readback)
+        self.assertIn("ALL SUCCESSはログ終端表示であり、MQ更新成功を証明しません。", writer)
+        self.assertIn("ALL SUCCESSはログ終端表示であり、MQ更新成功を証明しません。", readback)
+        self.assertIn("予定外ID・要確認", writer)
+        self.assertIn("予定外ID・要確認", readback)
+        for script in (writer, readback):
+            self.assertIn('"記録あり（ログ不完全・要確認）"', script)
+            self.assertIn('"ログ未記録（ログ不完全）・要確認"', script)
+        self.assertIn('"記録あり"', reader)
+        self.assertIn('"ログ未記録（ログ不完全）・要確認"', reader)
+
+    def test_mq_validator_rejects_missing_role_gate_or_result_readback_gate(self):
+        from build_flow_definition import build_mq_candidate, validate_mq_candidate
+
+        candidate = build_mq_candidate()
+        actions = candidate["properties"]["definition"]["actions"]
+        role_gate = find_action(actions, "Condition_MQ_Attachment_Roles")
+        role_gate["expression"] = {"equals": ["@equals(length(body('Filter_MQ_Logs')?['value']),1)", True]}
+        self.assertTrue(any("attachment roles" in error.lower() for error in validate_mq_candidate(candidate)))
+
+        candidate = build_mq_candidate()
+        actions = candidate["properties"]["definition"]["actions"]
+        readback = find_action(actions, "Condition_Readback_Matches_MQ")
+        readback["expression"] = {"equals": ["@true", True]}
+        self.assertTrue(
+            any("MQ success must require" in error for error in validate_mq_candidate(candidate))
+        )
+
+        candidate = build_mq_candidate()
+        actions = candidate["properties"]["definition"]["actions"]
+        batch_gate = find_action(actions, "Condition_MQ_Batch_Valid")
+        batch_gate["expression"] = {"equals": ["@outputs('Compose_MQ_Input_Result')?['comparison_available']", True]}
+        self.assertTrue(any("comparison_ready" in error for error in validate_mq_candidate(candidate)))
+
+        candidate = build_mq_candidate()
+        actions = candidate["properties"]["definition"]["actions"]
+        success = find_action(actions, "Update_case_success_MQ")
+        success["inputs"]["parameters"]["item"] = success["inputs"]["parameters"]["item"].replace(
+            "cr6cb_mqmissingcount", "cr6cb_missingcount"
+        )
+        self.assertTrue(any("seven MQ summary fields" in error for error in validate_mq_candidate(candidate)))
+
     def test_minimal_vertical_slice_has_power_apps_compose_and_dataverse_get(self):
         clientdata = build_clientdata()
         definition = clientdata["properties"]["definition"]

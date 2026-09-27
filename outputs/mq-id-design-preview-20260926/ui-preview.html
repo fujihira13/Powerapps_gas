@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MQ更新照合の画面見本（提案）</title>
+  <style>
+    :root{color-scheme:light;--ink:#1c2d42;--muted:#536982;--blue:#1859a8;--blue-soft:#eaf3ff;--line:#d7e1ed;--paper:#fff;--canvas:#eef3f8;--red:#a92d31;--red-soft:#fff0ef;--green:#1d6c53;font-family:"Segoe UI","Yu Gothic UI",Meiryo,sans-serif;color:var(--ink);background:var(--canvas)}
+    *{box-sizing:border-box}body{margin:0;min-width:320px}button,a{font:inherit}button{cursor:pointer}button:disabled{opacity:.46;cursor:not-allowed}a{color:#1556a3}
+    .noticebar{background:#25364b;color:#fff;padding:10px clamp(16px,4vw,40px);display:flex;gap:10px 20px;align-items:center;flex-wrap:wrap;font-size:13px}.noticebar b{background:#ffe8a9;color:#503c03;border-radius:99px;padding:4px 10px}.noticebar span{color:#e4edf7}
+    .app{max-width:1180px;margin:24px auto 48px;background:var(--paper);border:1px solid #d5dfeb;border-radius:12px;overflow:hidden;box-shadow:0 14px 42px #203c5a12}
+    .hero{padding:28px clamp(20px,4vw,48px) 24px;background:linear-gradient(110deg,#f5f9ff,#fff 66%);border-bottom:1px solid var(--line)}.hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap}.eyebrow{font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--blue);text-transform:uppercase}.hero h1{font-size:clamp(25px,3vw,34px);line-height:1.25;margin:8px 0 8px;letter-spacing:.01em}.hero p{color:var(--muted);font-size:15px;line-height:1.65;margin:0;max-width:760px}.proposal{flex:none;border:1px solid #e6c25e;background:#fff9e6;color:#6c5000;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:700}
+    .flow{padding:16px clamp(16px,4vw,48px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;overflow:auto}.flow button{white-space:nowrap;border:1px solid var(--line);background:#fff;color:#52647a;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:700}.flow button.current{background:var(--blue);border-color:var(--blue);color:#fff}.flow button.done{border-color:#a7c3e4;color:#184e8c;background:#f5f9ff}.flow .arrow{color:#8293a8}
+    .page{display:none}.page.active{display:block}.pagehead{padding:25px clamp(20px,4vw,48px) 0}.pagehead .kicker{font-size:12px;color:var(--blue);font-weight:800;letter-spacing:.08em}.pagehead h2{margin:5px 0 7px;font-size:25px}.pagehead p{max-width:830px;margin:0;color:var(--muted);font-size:14px;line-height:1.65}.content{padding:22px clamp(20px,4vw,48px) 34px}.card{border:1px solid var(--line);border-radius:10px;padding:20px;background:#fff}.card + .card{margin-top:16px}.card h3{font-size:17px;margin:0 0 12px}.hint{color:var(--muted);font-size:13px;line-height:1.65}.notice{border-radius:8px;padding:13px 15px;font-size:13px;line-height:1.6}.notice.blue{background:var(--blue-soft);color:#174679;border:1px solid #c8def7}.notice.red{background:var(--red-soft);color:#84262a;border:1px solid #efc2bf}.notice.gold{background:#fff8e8;color:#654b00;border:1px solid #ecd48a}.filegrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}.filecard{border:1px solid var(--line);border-radius:9px;padding:16px;background:#fbfdff;min-width:0}.filecard .type{font-size:11px;letter-spacing:.06em;color:var(--muted);font-weight:800}.filecard .filename{font-weight:750;font-size:17px;overflow-wrap:anywhere;margin:8px 0 5px}.filecard .state{font-size:13px;color:#7b8a9b}.filecard.selected{border-color:#94b9e5;background:#f5f9ff}.filecard.selected .state{color:var(--green);font-weight:700}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 16px;border:1px solid #a9bfd8;border-radius:8px;background:#fff;color:#164a86;font-weight:750;text-decoration:none}.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}.btn.link{border-color:#bfd2e7;background:#f7fbff}.btn:hover:not(:disabled){filter:brightness(.97)}.statebox{display:none;margin-top:15px}.statebox.show{display:block}.twocol{display:grid;grid-template-columns:1fr 1fr;gap:16px}.metricgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}.metric{border:1px solid var(--line);background:#fbfdff;border-radius:9px;padding:15px}.metric small{display:block;color:var(--muted);font-size:12px}.metric strong{display:block;font-size:27px;margin-top:4px}.metric.missing{background:var(--red-soft);border-color:#e9b5b2;color:#81272a}.metric.missing small{color:#84262a}.batchpill{display:inline-flex;border-radius:99px;padding:5px 9px;background:#edf3f9;color:#52647a;font-size:12px;font-weight:750}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:9px}table{border-collapse:collapse;width:100%;min-width:540px;text-align:left}th,td{padding:12px 14px;border-bottom:1px solid var(--line);font-size:14px}th{background:#f5f8fc;color:#4b6078;font-size:12px}tr:last-child td{border-bottom:0}.missing-row{background:#fff5f4}.missing-row td:first-child{border-left:4px solid #bd3d42;font-weight:800;color:#86282b}.tag{display:inline-block;border-radius:99px;padding:4px 9px;font-size:12px;font-weight:800}.tag.ok{background:#e6f4ed;color:#176247}.tag.missing{background:#ffe3e0;color:#992c31}.result-link{display:inline-flex;margin-top:9px;font-weight:750;text-underline-offset:3px}.logbox{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;background:#152234;color:#e7f0fa;border-radius:8px;padding:15px;font:13px/1.75 ui-monospace,Consolas,monospace}.logbox .absent{color:#ff9b93;font-weight:800}.logbox .success{color:#a8e9c4;font-weight:800}.reviewbox{display:grid;grid-template-columns:1fr 1fr;gap:14px}.reviewitem{border:1px solid var(--line);border-radius:9px;padding:17px;background:#fbfdff}.reviewitem b{display:block;margin-bottom:7px}.reviewitem p{margin:0;color:var(--muted);font-size:14px;line-height:1.65}.footer{border-top:1px solid var(--line);padding:16px clamp(20px,4vw,48px);font-size:12px;color:#5d6e82;background:#fafcff}
+    @media(max-width:720px){.app{margin:12px 8px 28px;border-radius:8px}.filegrid,.twocol,.reviewbox{grid-template-columns:1fr}.metricgrid{grid-template-columns:1fr}.metric{display:flex;align-items:center;justify-content:space-between;gap:12px}.metric strong{font-size:24px;margin:0}.flow{gap:5px}.flow button{padding:8px 10px}.flow .arrow{display:none}.pagehead h2{font-size:22px}}
+  </style>
+</head>
+<body>
+  <div class="noticebar"><b>画面見本・提案段階</b><span>実アプリではありません。クラウド接続・ファイル読込・保存・照合処理は行いません。表示は固定の架空データです。</span></div>
+  <main class="app">
+    <header class="hero">
+      <div class="hero-top">
+        <div><div class="eyebrow">MQ更新の確認イメージ</div><h1>予定のIDと、実行ログにあるIDを見比べる</h1><p>バッチ用Excelと実行後ログを並べ、ログに記録されていないIDを見つける、という案の操作を画面でたどれます。</p></div>
+        <div class="proposal">新しい画面案の見本</div>
+      </div>
+    </header>
+    <nav class="flow" aria-label="4画面の流れ">
+      <button type="button" class="current" data-go="intake">1　受付・対象確認</button><span class="arrow" aria-hidden="true">›</span>
+      <button type="button" data-go="progress" disabled>2　進捗一覧</button><span class="arrow" aria-hidden="true">›</span>
+      <button type="button" data-go="detail" disabled>3　件ごとの確認</button><span class="arrow" aria-hidden="true">›</span>
+      <button type="button" data-go="review" disabled>4　レビュー</button>
+    </nav>
+
+    <section class="page active" id="intake" aria-labelledby="intake-title">
+      <div class="pagehead"><div class="kicker">SCREEN 01</div><h2 id="intake-title">受付・対象確認</h2><p>最初に、バッチ用Excelと実行後ログを受け取る想定です。見本では固定の2ファイル名を表示します。</p></div>
+      <div class="content">
+        <div class="notice blue">「見本で試す」を押すと、下に見本ファイル名が入ります。ご自身のファイルを選ぶ操作や読み込みはありません。</div>
+        <div class="filegrid">
+          <article class="filecard" id="batch-card"><div class="type">バッチ用Excel</div><div class="filename" id="batch-name">ファイル未選択</div><div class="state" id="batch-state">予定IDが5件ある見本</div></article>
+          <article class="filecard" id="log-card"><div class="type">実行後ログ</div><div class="filename" id="log-name">ファイル未選択</div><div class="state" id="log-state">ログIDが4件ある見本</div></article>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="load-demo" type="button">見本で試す</button>
+          <button class="btn" id="save-demo" type="button" disabled>保存（見本）</button>
+          <button class="btn" id="start-demo" type="button" disabled>処理開始（見本）</button>
+        </div>
+        <div class="statebox" id="intake-state" aria-live="polite"></div>
+        <p class="hint" style="margin-top:16px">操作の順番：見本を表示 → 保存 → 処理開始。どのボタンも画面見本を進めるだけで、データを保存したりバッチを動かしたりしません。</p>
+      </div>
+    </section>
+
+    <section class="page" id="progress" aria-labelledby="progress-title">
+      <div class="pagehead"><div class="kicker">SCREEN 02</div><h2 id="progress-title">進捗一覧</h2><p>バッチ終了の表示と、IDごとにログへ記録されたかを分けて見せる想定です。</p></div>
+      <div class="content">
+        <div class="notice gold"><b>固定見本の表示です。</b>実際にファイルを照合した結果ではありません。ALL SUCCESSはバッチが最後まで動いた表示で、すべてのMQの反映成功を意味しません。</div>
+        <div class="metricgrid" aria-label="固定見本の件数">
+          <div class="metric"><small>更新予定</small><strong>5件</strong></div>
+          <div class="metric"><small>ログに記録</small><strong>4件</strong></div>
+          <div class="metric missing"><small>ログにない（確認対象）</small><strong>1件</strong></div>
+        </div>
+        <div class="card">
+          <h3>固定見本の照合一覧 <span class="batchpill">バッチ終了表示：ALL SUCCESS</span></h3>
+          <div class="tablewrap"><table>
+            <thead><tr><th scope="col">予定ID</th><th scope="col">実行ログ</th><th scope="col">確認</th></tr></thead>
+            <tbody>
+              <tr><td>MQ-0001</td><td>記録あり</td><td><span class="tag ok">ログで確認</span></td></tr>
+              <tr><td>MQ-0002</td><td>記録あり</td><td><span class="tag ok">ログで確認</span></td></tr>
+              <tr class="missing-row"><td>MQ-0003</td><td><b>記録なし</b></td><td><span class="tag missing">確認対象</span></td></tr>
+              <tr><td>MQ-0004</td><td>記録あり</td><td><span class="tag ok">ログで確認</span></td></tr>
+              <tr><td>MQ-0005</td><td>記録あり</td><td><span class="tag ok">ログで確認</span></td></tr>
+            </tbody>
+          </table></div>
+          <div class="actions"><button class="btn primary" id="open-detail" type="button">MQ-0003の内容を確認</button><button class="btn" type="button" data-go="intake">受付の画面へ戻る</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="detail" aria-labelledby="detail-title">
+      <div class="pagehead"><div class="kicker">SCREEN 03</div><h2 id="detail-title">件ごとの確認</h2><p>確認対象のMQ-0003を強調し、予定Excelとログのどちらを根拠にしているかを見せる想定です。</p></div>
+      <div class="content">
+        <div class="notice red"><b>MQ-0003：更新予定なのに、実行ログにIDの記録がありません。</b>今回の運用では、反映失敗として確認する対象です。</div>
+        <div class="twocol" style="margin-top:16px">
+          <article class="card"><h3>バッチ用Excelの見本</h3><p class="hint">batch-input.xlsx に、MQ-0003が更新予定IDとしてあります。</p><span class="batchpill">予定リスト：5件</span></article>
+          <article class="card"><h3>実行後ログの見本</h3><pre class="logbox">MQ_BOX_ID=MQ-0001
+MQ_BOX_ID=MQ-0002
+<span class="absent">MQ-0003 の記録なし</span>
+MQ_BOX_ID=MQ-0004
+MQ_BOX_ID=MQ-0005
+<span class="success">ALL SUCCESS</span></pre></article>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <h3>結果Excelのリンク例</h3>
+          <p class="hint">下のリンクは、フォルダーに同梱された固定の照合見本を開きます。この画面見本の操作で新しく作ったファイルではありません。</p>
+          <a class="result-link" href="./mq-id-preview.xlsx" target="_blank" rel="noopener">照合結果Excelの見本を開く　↗</a>
+        </div>
+        <div class="actions"><button class="btn" type="button" data-go="progress">進捗一覧へ戻る</button><button class="btn primary" id="open-review" type="button">4画面目のレビューを見る</button></div>
+      </div>
+    </section>
+
+    <section class="page" id="review" aria-labelledby="review-title">
+      <div class="pagehead"><div class="kicker">SCREEN 04</div><h2 id="review-title">レビュー</h2><p>これは既存の4画面構成で最後にある画面です。照合後の担当者確認とレビューを記録する役割を示します。</p></div>
+      <div class="content">
+        <div class="notice blue">今回の画面見本では、レビュー画面の位置づけだけを示しています。記録や役割の切り替えは行いません。</div>
+        <div class="reviewbox" style="margin-top:16px">
+          <article class="reviewitem"><b>担当者の確認</b><p>ログとの照合結果や、人が確認した内容を件ごとに見直します。</p></article>
+          <article class="reviewitem"><b>レビュー</b><p>レビューの結果や差し戻し理由を記録し、進捗一覧で確認できるようにする画面です。</p></article>
+        </div>
+        <div class="notice gold" style="margin-top:16px">全体の流れ：2ファイルを受け付ける → 保存してから処理開始 → MQ-0003の未記録を確認 → 必要な人の確認・レビューへ進む。</div>
+        <div class="actions"><button class="btn" type="button" data-go="detail">件ごとの確認へ戻る</button><button class="btn" type="button" data-go="progress">進捗一覧へ戻る</button></div>
+      </div>
+    </section>
+    <footer class="footer">このページは新しい画面案を説明するためのローカルHTML見本です。アプリの実装・承認済み仕様の変更・実行結果を表すものではありません。</footer>
+  </main>
+  <script>
+    const pages = ['intake', 'progress', 'detail', 'review'];
+    const visited = new Set(['intake']);
+    const buttons = [...document.querySelectorAll('[data-go]')];
+    function showPage(id) {
+      if (!pages.includes(id)) return;
+      visited.add(id);
+      document.querySelectorAll('.page').forEach(page => page.classList.toggle('active', page.id === id));
+      document.querySelectorAll('.flow [data-go]').forEach(button => {
+        const current = button.dataset.go === id;
+        button.classList.toggle('current', current);
+        button.classList.toggle('done', visited.has(button.dataset.go) && !current);
+        button.disabled = !visited.has(button.dataset.go);
+        button.setAttribute('aria-current', current ? 'step' : 'false');
+      });
+      window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+    buttons.forEach(button => button.addEventListener('click', () => showPage(button.dataset.go)));
+    document.getElementById('load-demo').addEventListener('click', () => {
+      document.getElementById('batch-name').textContent = 'batch-input.xlsx';
+      document.getElementById('batch-state').textContent = '固定見本を表示中 · 予定ID 5件';
+      document.getElementById('log-name').textContent = 'mock-log.txt';
+      document.getElementById('log-state').textContent = '固定見本を表示中 · ID記録 4件';
+      document.getElementById('batch-card').classList.add('selected');
+      document.getElementById('log-card').classList.add('selected');
+      document.getElementById('save-demo').disabled = false;
+      const state = document.getElementById('intake-state');
+      state.className = 'statebox show notice blue';
+      state.textContent = '2つの固定見本を表示しました。実ファイルは読み込んでいません。';
+    });
+    document.getElementById('save-demo').addEventListener('click', () => {
+      const state = document.getElementById('intake-state');
+      state.className = 'statebox show notice blue';
+      state.textContent = '見本上で「保存」を押した状態です。保存先には何も書き込んでいません。';
+      document.getElementById('start-demo').disabled = false;
+    });
+    document.getElementById('start-demo').addEventListener('click', () => {
+      visited.add('progress');
+      showPage('progress');
+    });
+    document.getElementById('open-detail').addEventListener('click', () => {
+      visited.add('detail');
+      showPage('detail');
+    });
+    document.getElementById('open-review').addEventListener('click', () => {
+      visited.add('review');
+      showPage('review');
+    });
+  </script>
+</body>
+</html>

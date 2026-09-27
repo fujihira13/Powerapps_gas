@@ -1022,6 +1022,936 @@ def build_excelurl_candidate(
     return candidate
 
 
+MQ_OFFICE_SCRIPT_IDS = {
+    "reader": "__SELECT_MQ_BATCH_READER_SCRIPT__",
+    "writer": "__SELECT_MQ_COMPARISON_WRITER_SCRIPT__",
+    "readback": "__SELECT_MQ_COMPARISON_READBACK_SCRIPT__",
+}
+
+
+def _rename_action_subtree(action: dict[str, Any], suffix: str) -> dict[str, Any]:
+    """Clone a normal destination subtree with distinct local action names."""
+    names = {name for name, _ in _all_actions({"root": action}) if name != "root"}
+    mapping = {name: f"{name}{suffix}" for name in names}
+    serialized = json.dumps(action, ensure_ascii=False)
+    for original, replacement in sorted(mapping.items(), key=lambda pair: -len(pair[0])):
+        serialized = serialized.replace(f'"{original}"', f'"{replacement}"')
+        serialized = serialized.replace(f"'{original}'", f"'{replacement}'")
+    result = json.loads(serialized)
+
+    def refresh_metadata(actions: dict[str, Any]) -> None:
+        for name, node in actions.items():
+            if not isinstance(node, dict):
+                continue
+            metadata = node.get("metadata")
+            if isinstance(metadata, dict) and "operationMetadataId" in metadata:
+                metadata["operationMetadataId"] = _metadata_id(f"mq:{name}")
+            nested = node.get("actions")
+            if isinstance(nested, dict):
+                refresh_metadata(nested)
+            nested_else = node.get("else", {}).get("actions", {})
+            if isinstance(nested_else, dict):
+                refresh_metadata(nested_else)
+
+    refresh_metadata({"root": result})
+    return result
+
+
+def _rewrite_action_references(action: dict[str, Any], replacements: dict[str, str]) -> dict[str, Any]:
+    """Rewrite expression references to actions supplied by an enclosing branch."""
+    serialized = json.dumps(action, ensure_ascii=False)
+    for original, replacement in sorted(replacements.items(), key=lambda pair: -len(pair[0])):
+        serialized = serialized.replace(f"'{original}'", f"'{replacement}'")
+    return json.loads(serialized)
+
+
+def _mq_log_validation_reason_expression() -> str:
+    expression = _log_validation_reason_expression()
+    for original, replacement in (
+        ("Compose_LogText", "Compose_LogText_MQ"),
+        ("Compose_LogFileName", "Compose_LogFileName_MQ"),
+        ("Compose_LogLines", "Compose_LogLines_MQ"),
+    ):
+        expression = expression.replace(original, replacement)
+    return expression
+
+
+def _mq_script_action(
+    name: str,
+    *,
+    file_expression: str,
+    script_placeholder: str,
+    script_parameters: dict[str, Any],
+    run_after: dict[str, list[str]],
+    drive_expression: str,
+) -> dict[str, Any]:
+    parameters: dict[str, Any] = {
+        "source": "me",
+        "drive": drive_expression,
+        "file": file_expression,
+        "scriptId": script_placeholder,
+    }
+    parameters.update(script_parameters)
+    return _openapi(
+        name,
+        EXCEL_API,
+        EXCEL_API,
+        "RunScriptProd",
+        parameters,
+        run_after,
+        retry_none=True,
+    )
+
+
+def _mq_result_readback_expression(read_action_name: str) -> str:
+    return "@json(body('" + read_action_name + "')?['result'])"
+
+
+def _mq_postcopy_unknown_item_expression() -> str:
+    generic_reason = (
+        "'コピー後のExcel書込・読戻しを確認できません。出力ファイルを確認し、"
+        "状態が判明するまで再実行しないでください。'"
+    )
+    writer_failure_reason = (
+        "concat('MQ結果シートの書き込みに失敗しました: ',"
+        "coalesce(outputs('Compose_MQ_Result_Write_MQ')?['error'],'詳細不明'),"
+        "'。結果Excelを確認し、判明するまで再実行しないでください。')"
+    )
+    parse_failure_reason = (
+        "'MQ結果シート書込の応答を解析できません。出力ファイルを確認し、"
+        "状態が判明するまで再実行しないでください。'"
+    )
+    reason = (
+        "if(equals(actions('Run_MQ_Result_Write_MQ')?['status'],'Succeeded'),"
+        "if(equals(actions('Compose_MQ_Result_Write_MQ')?['status'],'Succeeded'),"
+        "if(equals(outputs('Compose_MQ_Result_Write_MQ')?['ok'],false),"
+        f"{writer_failure_reason},{generic_reason}),"
+        f"{parse_failure_reason}),{generic_reason})"
+    )
+    return (
+        "@addProperty(addProperty(addProperty(json('{}'),"
+        "'cr6cb_processingstatus','結果不明'),"
+        f"'cr6cb_failurereason',{reason}),"
+        "'cr6cb_excelcheckstatus','読出不能')"
+    )
+
+
+def _mq_expected_readback_gate(expression: str) -> str:
+    if not expression.startswith("@and(") or not expression.endswith(")"):
+        raise ValueError("MQ candidate expected an AND-based Evidence readback expression")
+    return (
+        expression[:-1]
+        + ",equals(outputs('Compose_MQ_Result_Readback_MQ')?['ok'],true)"
+        + ",equals(outputs('Compose_MQ_Result_Readback_MQ')?['caseId'],outputs('Compose_CaseId')))"
+    )
+
+
+def _mq_incomplete_diagnostic_item_expression() -> str:
+    """Write parser-confirmed provisional diagnostics, never an output workbook."""
+    properties = (
+        ("cr6cb_processingstatus", "'停止'"),
+        (
+            "cr6cb_failurereason",
+            "'ログ末尾のALL SUCCESSがありません。暫定件数を診断情報として記録し、MQ転記と結果Excel作成を停止しました。'",
+        ),
+        ("cr6cb_mqterminalstatus", "'なし'"),
+        ("cr6cb_mqexpectedcount", "outputs('Compose_MQ_Input_Result')?['counts']?['expected']"),
+        ("cr6cb_mqloggedcount", "outputs('Compose_MQ_Input_Result')?['counts']?['logged']"),
+        ("cr6cb_mqmissingcount", "outputs('Compose_MQ_Input_Result')?['counts']?['missing']"),
+        (
+            "cr6cb_mqmissingids",
+            "join(outputs('Compose_MQ_Input_Result')?['missing_ids'],decodeUriComponent('%0A'))",
+        ),
+        ("cr6cb_mqcomparisonstatus", "'要確認'"),
+        ("cr6cb_mqresulttext", "outputs('Compose_MQ_Input_Result')?['result_text']"),
+    )
+    expression = "json('{}')"
+    for logical_name, value_expression in properties:
+        expression = f"addProperty({expression},'{logical_name}',{value_expression})"
+    return "@" + expression
+
+
+def build_mq_candidate(clientdata: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Return an offline MQ branch while leaving the one-note path intact."""
+    candidate = copy.deepcopy(build_excelurl_candidate() if clientdata is None else clientdata)
+    definition_actions = candidate["properties"]["definition"]["actions"]
+    start_actions = definition_actions["Condition_Start_Ready"]["actions"]
+    start_actions["List_attached_notes"]["inputs"]["parameters"]["$top"] = 3
+    one_note = start_actions["Condition_One_Note"]
+    original_log_condition = one_note["actions"]["Condition_Log_Matches"]
+    original_validation_actions = original_log_condition["actions"]
+    original_destination = original_validation_actions["Condition_One_Destination"]
+
+    # Copy the existing destination tree into a separately named MQ branch.
+    mq_destination = _rename_action_subtree(original_destination, "_MQ")
+    mq_destination = _rewrite_action_references(
+        mq_destination,
+        {
+            "Filter_active_destinations": "Filter_active_destinations_MQ",
+            "Compose_LogFileName": "Compose_LogFileName_MQ",
+            "Compose_LogText": "Compose_LogText_MQ",
+        },
+    )
+    mq_destination_true = mq_destination["actions"]
+    destination_path = mq_destination_true.pop("Compose_DestinationPath_MQ")
+    mq_destination_true.pop("Update_processing_MQ")
+    mq_destination_true.pop("Copy_template_MQ")
+    mq_destination_true.pop("Scope_Write_And_Verify_MQ")
+    copy_unknown = mq_destination_true.pop("Update_case_copy_unknown_MQ")
+    postcopy_unknown = mq_destination_true.pop("Update_case_postcopy_unknown_MQ")
+
+    # Give the input workbook a distinct, case-named derivative in the known
+    # T006 folder so Run script can open it without modifying the attachment.
+    stage_file = _openapi(
+        "Stage_MQ_Input",
+        ONEDRIVE_API,
+        ONEDRIVE_API,
+        "CreateFile",
+        {
+            "folderPath": T006_FOLDER_PATH,
+            "name": "@concat(outputs('Compose_CaseId'),'-MQ-Batch_Input.xlsx')",
+            "body": "@base64ToBinary(first(body('Filter_MQ_Books'))?['documentbody'])",
+        },
+        {"Update_processing_MQ": ["Succeeded"]},
+        retry_none=True,
+    )
+    reader_action = _mq_script_action(
+        "Run_MQ_Input_Validation",
+        file_expression="@outputs('Stage_MQ_Input')?['body/Id']",
+        script_placeholder=MQ_OFFICE_SCRIPT_IDS["reader"],
+        script_parameters={
+            "ScriptParameters/logText": "@outputs('Compose_LogText_MQ')",
+        },
+        run_after={"Stage_MQ_Input": ["Succeeded"]},
+        drive_expression="@first(body('Filter_active_destinations_MQ'))?['cr6cb_driveid']",
+    )
+    compose_input_result = _compose(
+        "Compose_MQ_Input_Result",
+        "@json(body('Run_MQ_Input_Validation')?['result'])",
+        {"Run_MQ_Input_Validation": ["Succeeded"]},
+    )
+
+    # Rebuild the Evidence write/readback scope using MQ-specific action names.
+    original_scope_actions = original_destination["actions"]["Scope_Write_And_Verify"]["actions"]
+    scope_actions = _rename_action_subtree(
+        {"actions": copy.deepcopy(original_scope_actions)}, "_MQ"
+    )["actions"]
+    scope_actions = _rewrite_action_references(
+        scope_actions,
+        {
+            "Compose_LogFileName": "Compose_LogFileName_MQ",
+            "Compose_LogText": "Compose_LogText_MQ",
+        },
+    )
+    for name in ("Replace_template_row_MQ", "Read_back_evidence_MQ", "Read_back_evidence_retry_MQ"):
+        action = _find_action(scope_actions, name)
+        if action is None:
+            raise ValueError(f"MQ Evidence action is missing: {name}")
+        parameters = action["inputs"]["parameters"]
+        parameters["file"] = "@outputs('Copy_template_MQ')?['body/Id']"
+        parameters["drive"] = "@first(body('Filter_active_destinations_MQ'))?['cr6cb_driveid']"
+
+    writer_action = _mq_script_action(
+        "Run_MQ_Result_Write_MQ",
+        file_expression="@outputs('Copy_template_MQ')?['body/Id']",
+        script_placeholder=MQ_OFFICE_SCRIPT_IDS["writer"],
+        script_parameters={
+            "ScriptParameters/validationJson": "@string(outputs('Compose_MQ_Input_Result'))",
+            "ScriptParameters/caseId": "@outputs('Compose_CaseId')",
+        },
+        run_after={"Replace_template_row_MQ": ["Succeeded"]},
+        drive_expression="@first(body('Filter_active_destinations_MQ'))?['cr6cb_driveid']",
+    )
+    writer_result_compose = _compose(
+        "Compose_MQ_Result_Write_MQ",
+        "@json(body('Run_MQ_Result_Write_MQ')?['result'])",
+        {"Run_MQ_Result_Write_MQ": ["Succeeded"]},
+    )
+    writer_result_gate = _compose(
+        "Compose_MQ_Result_Write_Gate_MQ",
+        "@div(1,if(equals(outputs('Compose_MQ_Result_Write_MQ')?['ok'],true),1,0))",
+        {"Compose_MQ_Result_Write_MQ": ["Succeeded"]},
+    )
+    result_read_action = _mq_script_action(
+        "Run_MQ_Result_Readback_MQ",
+        file_expression="@outputs('Copy_template_MQ')?['body/Id']",
+        script_placeholder=MQ_OFFICE_SCRIPT_IDS["readback"],
+        script_parameters={
+            "ScriptParameters/validationJson": "@string(outputs('Compose_MQ_Input_Result'))",
+            "ScriptParameters/caseId": "@outputs('Compose_CaseId')",
+        },
+        run_after={"Compose_MQ_Result_Write_Gate_MQ": ["Succeeded"]},
+        drive_expression="@first(body('Filter_active_destinations_MQ'))?['cr6cb_driveid']",
+    )
+    result_readback_compose = _compose(
+        "Compose_MQ_Result_Readback_MQ",
+        _mq_result_readback_expression("Run_MQ_Result_Readback_MQ"),
+        {"Run_MQ_Result_Readback_MQ": ["Succeeded"]},
+    )
+    scope_actions["Run_MQ_Result_Write_MQ"] = writer_action
+    scope_actions["Compose_MQ_Result_Write_MQ"] = writer_result_compose
+    scope_actions["Compose_MQ_Result_Write_Gate_MQ"] = writer_result_gate
+    scope_actions["Run_MQ_Result_Readback_MQ"] = result_read_action
+    scope_actions["Compose_MQ_Result_Readback_MQ"] = result_readback_compose
+    scope_actions["Delay_before_readback_MQ"]["runAfter"] = {
+        "Compose_MQ_Result_Readback_MQ": ["Succeeded"]
+    }
+    initial_condition = _find_action(scope_actions, "Condition_Readback_Matches_MQ")
+    retry_condition = _find_action(scope_actions, "Condition_Readback_Retry_Matches_MQ")
+    if initial_condition is None or retry_condition is None:
+        raise ValueError("MQ independent Evidence readback conditions are missing")
+    initial_match_expression = _mq_expected_readback_gate(
+        initial_condition["expression"]["equals"][0]
+    )
+    retry_match_expression = _mq_expected_readback_gate(
+        retry_condition["expression"]["equals"][0]
+    )
+    combined_match_expression = (
+        "@and(or(equals(length(body('Read_back_evidence_MQ')?['value']),0),"
+        + initial_match_expression[1:]
+        + "),"
+        + retry_match_expression[1:]
+        + ")"
+    )
+
+    # Persist the MQ summary only after both independent readbacks succeed.
+    mq_result_properties = (
+        (
+            "cr6cb_mqterminalstatus",
+            "if(equals(outputs('Compose_MQ_Input_Result')?['end_marker_present'],true),'あり','なし')",
+        ),
+        ("cr6cb_mqexpectedcount", "outputs('Compose_MQ_Input_Result')?['counts']?['expected']"),
+        ("cr6cb_mqloggedcount", "outputs('Compose_MQ_Input_Result')?['counts']?['logged']"),
+        ("cr6cb_mqmissingcount", "outputs('Compose_MQ_Input_Result')?['counts']?['missing']"),
+        (
+            "cr6cb_mqmissingids",
+            "join(outputs('Compose_MQ_Input_Result')?['missing_ids'],decodeUriComponent('%0A'))",
+        ),
+        (
+            "cr6cb_mqcomparisonstatus",
+            "outputs('Compose_MQ_Input_Result')?['presentation']?['status_label']",
+        ),
+        (
+            "cr6cb_mqresulttext",
+            "outputs('Compose_MQ_Result_Readback_MQ')?['resultText']",
+        ),
+    )
+    success_action = _find_action(scope_actions, "Update_case_success_MQ")
+    if success_action is None:
+        raise ValueError("MQ success action is missing")
+    item = success_action["inputs"]["parameters"]["item"]
+    item_expression = item[1:] if item.startswith("@") else item
+    for logical_name, value_expression in mq_result_properties:
+        item_expression = f"addProperty({item_expression},'{logical_name}',{value_expression})"
+    success_action["inputs"]["parameters"]["item"] = "@" + item_expression
+
+    # Keep both independent Evidence reads inside the write/verify scope so
+    # any read or wait failure reaches the existing post-copy unknown handler.
+    # The single result gate sits beside the scope to stay within the live
+    # flow's maximum nesting depth. It accepts an empty first read only when
+    # the second read matches; otherwise both reads must independently match.
+    readback_empty_condition = scope_actions.pop("Condition_Readback_Is_Empty_MQ", None)
+    if not isinstance(readback_empty_condition, dict):
+        raise ValueError("MQ initial readback condition is missing")
+    retry_actions = readback_empty_condition.get("actions")
+    if not isinstance(retry_actions, dict):
+        raise ValueError("MQ retry readback branch is missing")
+    retry_delay = retry_actions.get("Delay_before_readback_retry_MQ")
+    retry_read = retry_actions.get("Read_back_evidence_retry_MQ")
+    retry_condition = retry_actions.get("Condition_Readback_Retry_Matches_MQ")
+    if not all(isinstance(action, dict) for action in (retry_delay, retry_read, retry_condition)):
+        raise ValueError("MQ retry readback actions are incomplete")
+    initial_branch_actions = readback_empty_condition.get("else", {}).get("actions", {})
+    if not isinstance(initial_branch_actions, dict):
+        raise ValueError("MQ initial match branch is missing")
+    initial_condition = initial_branch_actions.get("Condition_Readback_Matches_MQ")
+    if not isinstance(initial_condition, dict):
+        raise ValueError("MQ initial match condition is missing")
+
+    retry_delay["runAfter"] = {"Read_back_evidence_MQ": ["Succeeded"]}
+    retry_read["runAfter"] = {"Delay_before_readback_retry_MQ": ["Succeeded"]}
+    scope_actions["Delay_before_readback_retry_MQ"] = retry_delay
+    scope_actions["Read_back_evidence_retry_MQ"] = retry_read
+    initial_condition["runAfter"] = {"Scope_Write_And_Verify_MQ": ["Succeeded"]}
+    initial_condition["expression"] = {"equals": [combined_match_expression, True]}
+    initial_condition["metadata"]["operationMetadataId"] = _metadata_id(
+        "Condition_Readback_Matches_MQ:combined"
+    )
+
+    for action_name, action in _all_actions(scope_actions):
+        metadata = action.get("metadata")
+        if isinstance(metadata, dict) and "operationMetadataId" in metadata:
+            metadata["operationMetadataId"] = _metadata_id(f"mq:{action_name}")
+
+    # All input validation happens before Copy_template_MQ. The copied
+    # workbook retains Evidence and receives a separate MQ_Comparison sheet.
+    copy_result_template = _openapi(
+        "Copy_template_MQ",
+        ONEDRIVE_API,
+        ONEDRIVE_API,
+        "CopyDriveFileByPath",
+        {
+            "source": T006_TEMPLATE_PATH,
+            "destination": "@outputs('Compose_DestinationPath_MQ')",
+            "overwrite": False,
+        },
+        {},
+        retry_none=True,
+    )
+    invalid_input_stop = _update_case(
+        "Update_case_stop_mq_input_invalid",
+        "@addProperty(addProperty(json('{}'),'cr6cb_processingstatus','停止'),"
+        "'cr6cb_failurereason','Batch_InputまたはログのMQ ID形式・重複・添付内容を確認してください。')",
+        {},
+    )
+    incomplete_diagnostic = _update_case(
+        "Update_case_mq_incomplete_diagnostic",
+        _mq_incomplete_diagnostic_item_expression(),
+        {},
+    )
+    incomplete_condition = _condition(
+        "Condition_MQ_Log_Incomplete",
+        {
+            "equals": [
+                "@and(equals(outputs('Compose_MQ_Input_Result')?['contract_version'],'mq-id-result.v1'),equals(outputs('Compose_MQ_Input_Result')?['status'],'log_incomplete'),equals(outputs('Compose_MQ_Input_Result')?['comparison_available'],true),equals(outputs('Compose_MQ_Input_Result')?['end_marker_present'],false))",
+                True,
+            ]
+        },
+        {
+            "Update_case_mq_incomplete_diagnostic": incomplete_diagnostic,
+            "Update_case_mq_incomplete_diagnostic_unknown": _update_case(
+                "Update_case_mq_incomplete_diagnostic_unknown",
+                _failure_item(
+                    "結果不明",
+                    "ログ不完全の診断情報を書き込めたか確認できません。状態を確定するまで再実行しないでください。",
+                    "未確認",
+                ),
+                {"Update_case_mq_incomplete_diagnostic": ["Failed", "TimedOut"]},
+            ),
+        },
+        {},
+        {"Update_case_stop_mq_input_invalid": invalid_input_stop},
+    )
+    destination_success_actions = {
+        "Compose_DestinationPath_MQ": destination_path,
+        "Update_processing_MQ": _update_case(
+            "Update_processing_MQ",
+            "@addProperty(json('{}'),'cr6cb_processingstatus','処理中')",
+            {"Compose_DestinationPath_MQ": ["Succeeded"]},
+        ),
+        "Stage_MQ_Input": stage_file,
+        "Run_MQ_Input_Validation": reader_action,
+        "Compose_MQ_Input_Result": compose_input_result,
+        "Update_case_mq_stage_unknown": _update_case(
+            "Update_case_mq_stage_unknown",
+            _failure_item(
+                "結果不明",
+                "MQ入力ブックのOneDriveコピー結果を確認できません。OneDriveを確認し、判明するまで再実行しないでください。",
+                "未確認",
+            ),
+            {"Stage_MQ_Input": ["Failed", "TimedOut"]},
+        ),
+        "Update_case_mq_reader_unknown": _update_case(
+            "Update_case_mq_reader_unknown",
+            _failure_item(
+                "結果不明",
+                "Batch_Inputの読取結果を確認できません。結果Excelは作成していません。確認が終わるまで再実行しないでください。",
+                "未確認",
+            ),
+            {"Run_MQ_Input_Validation": ["Failed", "TimedOut"]},
+        ),
+        "Update_case_mq_reader_result_unknown": _update_case(
+            "Update_case_mq_reader_result_unknown",
+            _failure_item(
+                "結果不明",
+                "Office Scriptの入力検査結果を解析できません。結果Excelは作成していません。再実行前に確認してください。",
+                "未確認",
+            ),
+            {"Compose_MQ_Input_Result": ["Failed", "TimedOut"]},
+        ),
+    }
+    destination_success_actions["Condition_MQ_Batch_Valid"] = _condition(
+        "Condition_MQ_Batch_Valid",
+        {
+            "equals": [
+                "@and(equals(outputs('Compose_MQ_Input_Result')?['contract_version'],'mq-id-result.v1'),equals(outputs('Compose_MQ_Input_Result')?['comparison_available'],true),equals(outputs('Compose_MQ_Input_Result')?['status'],'comparison_ready'))",
+                True,
+            ]
+        },
+        {
+            "Copy_template_MQ": copy_result_template,
+            "Scope_Write_And_Verify_MQ": {
+                "runAfter": {"Copy_template_MQ": ["Succeeded"]},
+                "metadata": {"operationMetadataId": _metadata_id("Scope_Write_And_Verify_MQ")},
+                "type": "Scope",
+                "actions": scope_actions,
+            },
+            "Condition_Readback_Matches_MQ": initial_condition,
+            "Update_case_readback_condition_unknown_MQ": _update_case(
+                "Update_case_readback_condition_unknown_MQ",
+                _failure_item(
+                    "結果不明",
+                    "2回のEvidence読戻しの判定結果が不明です。状態を確認し、判明するまで再実行しないでください。",
+                    "未確認",
+                ),
+                {"Condition_Readback_Matches_MQ": ["Failed", "TimedOut"]},
+            ),
+            "Update_case_copy_unknown_MQ": copy_unknown,
+            "Update_case_postcopy_unknown_MQ": postcopy_unknown,
+        },
+        {"Compose_MQ_Input_Result": ["Succeeded"]},
+        {
+            "Condition_MQ_Log_Incomplete": incomplete_condition,
+            "Update_case_mq_incomplete_condition_unknown": _update_case(
+                "Update_case_mq_incomplete_condition_unknown",
+                _failure_item(
+                    "結果不明",
+                    "ログ不完全診断の条件結果を確認できません。結果Excelは作成していません。状態を確認してください。",
+                    "未確認",
+                ),
+                {"Condition_MQ_Log_Incomplete": ["Failed", "TimedOut"]},
+            ),
+        },
+    )
+    destination_success_actions["Update_case_mq_validation_condition_unknown"] = _update_case(
+        "Update_case_mq_validation_condition_unknown",
+        "@addProperty(json('{}'),'cr6cb_processingstatus','結果不明')",
+        {"Condition_MQ_Batch_Valid": ["Failed", "TimedOut"]},
+    )
+    postcopy_unknown["inputs"]["parameters"]["item"] = _mq_postcopy_unknown_item_expression()
+    mq_destination["actions"] = destination_success_actions
+
+    # Preserve the original one-note route and add exactly one separate
+    # two-attachment path for MQ mode.
+    log_filter = {
+        "runAfter": {},
+        "metadata": {"operationMetadataId": _metadata_id("Filter_MQ_Logs")},
+        "type": "Query",
+        "inputs": {
+            "from": "@body('List_attached_notes')?['value']",
+            "where": "@endsWith(toLower(coalesce(item()?['filename'],'')),'.txt')",
+        },
+    }
+    book_filter = {
+        "runAfter": {},
+        "metadata": {"operationMetadataId": _metadata_id("Filter_MQ_Books")},
+        "type": "Query",
+        "inputs": {
+            "from": "@body('List_attached_notes')?['value']",
+            "where": "@endsWith(toLower(coalesce(item()?['filename'],'')),'.xlsx')",
+        },
+    }
+    role_gate = _condition(
+        "Condition_MQ_Attachment_Roles",
+        {
+            "equals": [
+                "@and(equals(length(body('List_attached_notes')?['value']),2),equals(length(body('Filter_MQ_Logs')),1),equals(length(body('Filter_MQ_Books')),1))",
+                True,
+            ]
+        },
+        {},
+        {"Filter_MQ_Logs": ["Succeeded"], "Filter_MQ_Books": ["Succeeded"]},
+        {
+            "Update_case_stop_mq_roles": _update_case(
+                "Update_case_stop_mq_roles",
+                _failure_item("停止", "MQ照合には.txtログと.xlsxブックが各1件必要です。欠落、重複、別形式の添付を確認してください。"),
+                {},
+            )
+        },
+    )
+    role_gate["actions"] = {
+        "Compose_LogText_MQ": _compose(
+            "Compose_LogText_MQ",
+            "@base64ToString(first(body('Filter_MQ_Logs'))?['documentbody'])",
+            {},
+        ),
+        "Update_case_stop_mq_log_unreadable": _update_case(
+            "Update_case_stop_mq_log_unreadable",
+            _failure_item("停止", "MQ用の添付ログ本文を読み取れませんでした。本文データが欠落または不正です。"),
+            {"Compose_LogText_MQ": ["Failed", "TimedOut"]},
+        ),
+        "Compose_LogFileName_MQ": _compose(
+            "Compose_LogFileName_MQ",
+            "@first(body('Filter_MQ_Logs'))?['filename']",
+            {"Compose_LogText_MQ": ["Succeeded"]},
+        ),
+        "Compose_LogLines_MQ": _compose(
+            "Compose_LogLines_MQ",
+            "@split(replace(outputs('Compose_LogText_MQ'),decodeUriComponent('%0D'),''),decodeUriComponent('%0A'))",
+            {"Compose_LogFileName_MQ": ["Succeeded"]},
+        ),
+        "Compose_LogValidationReason_MQ": _compose(
+            "Compose_LogValidationReason_MQ",
+            _mq_log_validation_reason_expression(),
+            {"Compose_LogLines_MQ": ["Succeeded"]},
+        ),
+        "Compose_IsValidLog_MQ": _compose(
+            "Compose_IsValidLog_MQ",
+            "@equals(outputs('Compose_LogValidationReason_MQ'),'')",
+            {"Compose_LogValidationReason_MQ": ["Succeeded"]},
+        ),
+    }
+    role_gate["actions"]["Condition_Log_Matches_MQ"] = _condition(
+        "Condition_Log_Matches_MQ",
+        {"equals": ["@outputs('Compose_IsValidLog_MQ')", True]},
+        {},
+        {"Compose_IsValidLog_MQ": ["Succeeded"]},
+        {
+            "Update_case_stop_log_invalid_MQ": _update_case(
+                "Update_case_stop_log_invalid_MQ",
+                "@addProperty(addProperty(json('{}'),'cr6cb_processingstatus','停止'),'cr6cb_failurereason',outputs('Compose_LogValidationReason_MQ'))",
+                {},
+            )
+        },
+    )
+    destination_lookup = _rename_action_subtree(
+        {
+            "actions": {
+                "List_active_destinations": original_validation_actions["List_active_destinations"],
+                "Filter_active_destinations": original_validation_actions["Filter_active_destinations"],
+            }
+        },
+        "_MQ",
+    )["actions"]
+    destination_lookup["Filter_active_destinations_MQ"]["runAfter"] = {
+        "List_active_destinations_MQ": ["Succeeded"]
+    }
+    role_gate["actions"]["Condition_Log_Matches_MQ"]["actions"] = {
+        "List_active_destinations_MQ": destination_lookup["List_active_destinations_MQ"],
+        "Filter_active_destinations_MQ": destination_lookup["Filter_active_destinations_MQ"],
+        "Condition_One_Destination_MQ": mq_destination,
+    }
+    mq_destination["runAfter"] = {"Filter_active_destinations_MQ": ["Succeeded"]}
+    two_attachment_condition = _condition(
+        "Condition_Two_Attachments",
+        {"equals": ["@equals(length(body('List_attached_notes')?['value']),2)", True]},
+        {
+            "Filter_MQ_Logs": log_filter,
+            "Filter_MQ_Books": book_filter,
+            "Condition_MQ_Attachment_Roles": role_gate,
+        },
+        {},
+        {
+            "Update_case_stop_no_note": _update_case(
+                "Update_case_stop_no_note",
+                _failure_item("停止", "添付ファイルが1件（従来経路）または2件（MQ照合）ではありません。"),
+                {},
+            )
+        },
+    )
+    one_note["else"]["actions"] = {"Condition_Two_Attachments": two_attachment_condition}
+    return candidate
+
+
+def _mq_action_reference_errors(actions: dict[str, Any]) -> list[str]:
+    """Reject action references not available in the MQ path or its ancestors."""
+    one_note = _find_action(actions, "Condition_One_Note")
+    two_attachment = (
+        one_note.get("else", {}).get("actions", {}).get("Condition_Two_Attachments")
+        if isinstance(one_note, dict)
+        else None
+    )
+    if not isinstance(two_attachment, dict):
+        return []
+
+    mq_branch = {"Condition_Two_Attachments": two_attachment}
+    local_actions = {name for name, _ in _all_actions(mq_branch)}
+    shared_ancestor_actions = {"Compose_CaseId", "Get_case", "List_attached_notes"}
+    references = set(re.findall(r"\b(?:outputs|body|actions)\('([^']+)'\)", json.dumps(mq_branch, ensure_ascii=False)))
+    unresolved = sorted(references - local_actions - shared_ancestor_actions)
+    if not unresolved:
+        return []
+    return [
+        "MQ branch expressions reference unavailable or non-MQ actions: " + ", ".join(unresolved)
+    ]
+
+
+def _mq_action_depth_errors(actions: dict[str, Any]) -> list[str]:
+    """Enforce the live-flow action nesting limit for the separate MQ route."""
+    max_depth = 8
+    errors: list[str] = []
+
+    def visit(action_map: dict[str, Any], depth: int, in_mq_branch: bool, path: tuple[str, ...]) -> None:
+        for name, action in action_map.items():
+            current_path = path + (name,)
+            current_in_mq_branch = in_mq_branch or name == "Condition_Two_Attachments"
+            if current_in_mq_branch and depth > max_depth:
+                errors.append(
+                    f"MQ action {'/'.join(current_path)} is at level {depth}, exceeding the limit {max_depth}"
+                )
+            if not isinstance(action, dict):
+                continue
+            nested = action.get("actions", {})
+            if isinstance(nested, dict):
+                visit(nested, depth + 1, current_in_mq_branch, current_path)
+            nested_else = action.get("else", {}).get("actions", {})
+            if isinstance(nested_else, dict):
+                visit(nested_else, depth + 1, current_in_mq_branch, current_path)
+
+    visit(actions, 0, False, ())
+    return errors
+
+
+def validate_mq_candidate(clientdata: dict[str, Any]) -> list[str]:
+    """Check the local MQ branch while explicitly permitting known script IDs."""
+    errors: list[str] = []
+    sanitized = copy.deepcopy(clientdata)
+    for _, action in _all_actions(sanitized["properties"]["definition"]["actions"]):
+        inputs = action.get("inputs", {})
+        parameters = inputs.get("parameters", {}) if isinstance(inputs, dict) else {}
+        if isinstance(parameters, dict):
+            script_id = parameters.get("scriptId")
+            if script_id in MQ_OFFICE_SCRIPT_IDS.values():
+                parameters["scriptId"] = "ms-officescript%3A%2F%2Fonedrive_business_itemlink%2FLOCAL_CANDIDATE"
+    errors.extend(validate_clientdata(sanitized))
+    actions = clientdata.get("properties", {}).get("definition", {}).get("actions", {})
+    errors.extend(_mq_action_reference_errors(actions))
+    errors.extend(_mq_action_depth_errors(actions))
+    one_attachment = _find_action(actions, "Condition_One_Note")
+    if not isinstance(one_attachment, dict) or one_attachment.get("expression") != {
+        "equals": ["@length(body('List_attached_notes')?['value'])", 1]
+    }:
+        errors.append("legacy one-attachment route must remain unchanged")
+    if not isinstance(one_attachment, dict) or "Condition_Two_Attachments" not in one_attachment.get("else", {}).get("actions", {}):
+        errors.append("two-attachment MQ mode must remain separate from the legacy route")
+    role_gate = _find_action(actions, "Condition_MQ_Attachment_Roles")
+    if not isinstance(role_gate, dict) or role_gate.get("expression") != {
+        "equals": [
+            "@and(equals(length(body('List_attached_notes')?['value']),2),equals(length(body('Filter_MQ_Logs')),1),equals(length(body('Filter_MQ_Books')),1))",
+            True,
+        ]
+    }:
+        errors.append("MQ attachment roles must require exactly one .txt and one .xlsx from two notes")
+    for name, extension in (("Filter_MQ_Logs", ".txt"), ("Filter_MQ_Books", ".xlsx")):
+        action = _find_action(actions, name)
+        where = action.get("inputs", {}).get("where", "") if isinstance(action, dict) else ""
+        if action is None or f"'{extension}'" not in where or "toLower" not in where:
+            errors.append(f"MQ role filter must identify {extension} case-insensitively")
+    stage = _find_action(actions, "Stage_MQ_Input")
+    if (
+        not isinstance(stage, dict)
+        or stage.get("inputs", {}).get("host", {}).get("operationId") != "CreateFile"
+        or stage.get("inputs", {}).get("retryPolicy") != {"type": "none"}
+        or stage.get("inputs", {}).get("parameters", {}).get("folderPath") != T006_FOLDER_PATH
+        or "outputs('Compose_CaseId')" not in stage.get("inputs", {}).get("parameters", {}).get("name", "")
+    ):
+        errors.append("MQ input must be copied to the T006 OneDrive folder under a caseId-based name without automatic retry")
+    reader = _find_action(actions, "Run_MQ_Input_Validation")
+    if (
+        not isinstance(reader, dict)
+        or reader.get("inputs", {}).get("host", {}).get("operationId") != "RunScriptProd"
+        or reader.get("inputs", {}).get("parameters", {}).get("scriptId") != MQ_OFFICE_SCRIPT_IDS["reader"]
+        or reader.get("inputs", {}).get("retryPolicy") != {"type": "none"}
+    ):
+        errors.append("MQ input validation must use the selected Office Script without automatic retry")
+    batch_gate = _find_action(actions, "Condition_MQ_Batch_Valid")
+    batch_gate_expression = (
+        json.dumps(batch_gate.get("expression", {}), ensure_ascii=False)
+        if isinstance(batch_gate, dict)
+        else ""
+    )
+    if (
+        "mq-id-result.v1" not in batch_gate_expression
+        or "comparison_available" not in batch_gate_expression
+        or "comparison_ready" not in batch_gate_expression
+    ):
+        errors.append("MQ report generation must require mq-id-result.v1 comparison_ready with its terminal marker")
+    if (
+        not isinstance(batch_gate, dict)
+        or "Copy_template_MQ" not in batch_gate.get("actions", {})
+        or "Scope_Write_And_Verify_MQ" not in batch_gate.get("actions", {})
+        or "Condition_MQ_Log_Incomplete" not in batch_gate.get("else", {}).get("actions", {})
+    ):
+        errors.append("MQ result creation must stay on the valid comparison_ready branch; invalid or incomplete inputs must stop")
+    incomplete_gate = _find_action(actions, "Condition_MQ_Log_Incomplete")
+    if not isinstance(incomplete_gate, dict) or incomplete_gate.get("expression") != {
+        "equals": [
+            "@and(equals(outputs('Compose_MQ_Input_Result')?['contract_version'],'mq-id-result.v1'),equals(outputs('Compose_MQ_Input_Result')?['status'],'log_incomplete'),equals(outputs('Compose_MQ_Input_Result')?['comparison_available'],true),equals(outputs('Compose_MQ_Input_Result')?['end_marker_present'],false))",
+            True,
+        ]
+    }:
+        errors.append("provisional diagnostics must require a valid log_incomplete result without an end marker")
+    elif (
+        "Update_case_mq_incomplete_diagnostic" not in incomplete_gate.get("actions", {})
+        or "Update_case_stop_mq_input_invalid" not in incomplete_gate.get("else", {}).get("actions", {})
+        or "Copy_template_MQ" in json.dumps(incomplete_gate.get("actions", {}))
+        or "Run_MQ_Result_Write_MQ" in json.dumps(incomplete_gate.get("actions", {}))
+        or "cr6cb_excelurl" in json.dumps(incomplete_gate.get("actions", {}))
+    ):
+        errors.append("log_incomplete may write diagnostic columns only; it must not create a result workbook, write a report, or set a result link")
+    writer = _find_action(actions, "Run_MQ_Result_Write_MQ")
+    writer_result = _find_action(actions, "Compose_MQ_Result_Write_MQ")
+    writer_gate = _find_action(actions, "Compose_MQ_Result_Write_Gate_MQ")
+    result_reader = _find_action(actions, "Run_MQ_Result_Readback_MQ")
+    if (
+        not isinstance(writer, dict)
+        or not isinstance(writer_result, dict)
+        or not isinstance(writer_gate, dict)
+        or not isinstance(result_reader, dict)
+        or writer.get("inputs", {}).get("host", {}).get("operationId") != "RunScriptProd"
+        or result_reader.get("inputs", {}).get("host", {}).get("operationId") != "RunScriptProd"
+        or writer.get("inputs", {}).get("parameters", {}).get("scriptId") != MQ_OFFICE_SCRIPT_IDS["writer"]
+        or result_reader.get("inputs", {}).get("parameters", {}).get("scriptId") != MQ_OFFICE_SCRIPT_IDS["readback"]
+        or writer.get("inputs", {}).get("retryPolicy") != {"type": "none"}
+        or result_reader.get("inputs", {}).get("retryPolicy") != {"type": "none"}
+    ):
+        errors.append("MQ result writing and readback must use separate selected scripts without automatic retry")
+    if isinstance(writer, dict) and isinstance(result_reader, dict):
+        writer_parameters = writer.get("inputs", {}).get("parameters", {})
+        reader_parameters = result_reader.get("inputs", {}).get("parameters", {})
+        if (
+            not isinstance(writer_parameters, dict)
+            or not isinstance(reader_parameters, dict)
+            or "ScriptParameters/caseId" not in writer_parameters
+            or "ScriptParameters/caseId" not in reader_parameters
+            or writer.get("runAfter") != {"Replace_template_row_MQ": ["Succeeded"]}
+        ):
+            errors.append("MQ writer and independent readback must receive caseId after Evidence write")
+    if (
+        not isinstance(writer_result, dict)
+        or writer_result.get("type") != "Compose"
+        or writer_result.get("inputs") != "@json(body('Run_MQ_Result_Write_MQ')?['result'])"
+        or writer_result.get("runAfter") != {"Run_MQ_Result_Write_MQ": ["Succeeded"]}
+        or not isinstance(writer_gate, dict)
+        or writer_gate.get("type") != "Compose"
+        or writer_gate.get("inputs")
+        != "@div(1,if(equals(outputs('Compose_MQ_Result_Write_MQ')?['ok'],true),1,0))"
+        or writer_gate.get("runAfter") != {"Compose_MQ_Result_Write_MQ": ["Succeeded"]}
+        or not isinstance(result_reader, dict)
+        or result_reader.get("runAfter") != {"Compose_MQ_Result_Write_Gate_MQ": ["Succeeded"]}
+    ):
+        errors.append("MQ writer result must gate readback on ok=true and preserve the unknown failure path")
+    evidence_scope = _find_action(actions, "Scope_Write_And_Verify_MQ")
+    if not isinstance(evidence_scope, dict) or not isinstance(evidence_scope.get("actions"), dict):
+        errors.append("MQ Evidence write and both readbacks must remain in one failure-handling scope")
+        evidence_scope_actions: dict[str, Any] = {}
+    else:
+        evidence_scope_actions = evidence_scope["actions"]
+    initial_read = evidence_scope_actions.get("Read_back_evidence_MQ")
+    retry_delay = evidence_scope_actions.get("Delay_before_readback_retry_MQ")
+    retry_read = evidence_scope_actions.get("Read_back_evidence_retry_MQ")
+    if (
+        not isinstance(initial_read, dict)
+        or not isinstance(retry_delay, dict)
+        or not isinstance(retry_read, dict)
+        or initial_read.get("runAfter") != {"Delay_before_readback_MQ": ["Succeeded"]}
+        or retry_delay.get("runAfter") != {"Read_back_evidence_MQ": ["Succeeded"]}
+        or retry_read.get("runAfter") != {"Delay_before_readback_retry_MQ": ["Succeeded"]}
+    ):
+        errors.append("MQ must perform an independent second Evidence read only after the initial read succeeds")
+    if any(
+        name in evidence_scope_actions
+        for name in (
+            "Condition_Readback_Is_Empty_MQ",
+            "Condition_Readback_Matches_MQ",
+            "Condition_Readback_Retry_Matches_MQ",
+        )
+    ):
+        errors.append("MQ readback decision conditions must stay outside the write/verify scope")
+    readback_gate = _find_action(actions, "Condition_Readback_Matches_MQ")
+    readback_expression = (
+        json.dumps(readback_gate.get("expression", {}), ensure_ascii=False)
+        if isinstance(readback_gate, dict)
+        else ""
+    )
+    if (
+        not isinstance(readback_gate, dict)
+        or readback_gate.get("type") != "If"
+        or readback_gate.get("runAfter") != {"Scope_Write_And_Verify_MQ": ["Succeeded"]}
+        or "Read_back_evidence_MQ" not in readback_expression
+        or "Read_back_evidence_retry_MQ" not in readback_expression
+        or "Compose_MQ_Result_Readback_MQ" not in readback_expression
+        or "or(equals(length(body('Read_back_evidence_MQ')?['value']),0)" not in readback_expression
+        or "Update_case_success_MQ" not in readback_gate.get("actions", {})
+        or "Update_case_readback_unknown_MQ" not in readback_gate.get("else", {}).get("actions", {})
+    ):
+        errors.append("MQ success must require the retry match and either an empty initial read or an initial match")
+    condition_unknown = _find_action(actions, "Update_case_readback_condition_unknown_MQ")
+    if (
+        not isinstance(condition_unknown, dict)
+        or condition_unknown.get("runAfter") != {"Condition_Readback_Matches_MQ": ["Failed", "TimedOut"]}
+    ):
+        errors.append("MQ readback decision failures must remain an explicit 結果不明 path")
+    unknown = _find_action(actions, "Update_case_postcopy_unknown_MQ")
+    if (
+        not isinstance(unknown, dict)
+        or unknown.get("runAfter") != {"Scope_Write_And_Verify_MQ": ["Failed", "TimedOut"]}
+        or "結果不明" not in json.dumps(unknown, ensure_ascii=False)
+        or "outputs('Compose_MQ_Result_Write_MQ')?['error']"
+        not in unknown.get("inputs", {}).get("parameters", {}).get("item", "")
+    ):
+        errors.append("MQ copy, Evidence write, MQ sheet write, and readback failures must stay 結果不明 with the writer reason when available")
+    validation_unknown = _find_action(actions, "Update_case_mq_validation_condition_unknown")
+    validation_unknown_item = (
+        validation_unknown.get("inputs", {}).get("parameters", {}).get("item", "")
+        if isinstance(validation_unknown, dict)
+        else ""
+    )
+    if (
+        not isinstance(validation_unknown, dict)
+        or validation_unknown.get("runAfter") != {"Condition_MQ_Batch_Valid": ["Failed", "TimedOut"]}
+        or "cr6cb_failurereason" in validation_unknown_item
+        or "cr6cb_processingstatus','結果不明'" not in validation_unknown_item
+    ):
+        errors.append("broad MQ unknown fallback must preserve an existing failure reason")
+    if validation_unknown_item != "@addProperty(json('{}'),'cr6cb_processingstatus','結果不明')":
+        errors.append("broad MQ unknown fallback must update processing status only")
+    summary_fields = {
+        "cr6cb_mqterminalstatus",
+        "cr6cb_mqexpectedcount",
+        "cr6cb_mqloggedcount",
+        "cr6cb_mqmissingcount",
+        "cr6cb_mqmissingids",
+        "cr6cb_mqcomparisonstatus",
+        "cr6cb_mqresulttext",
+    }
+    field_writers: set[str] = set()
+    for action_name, action in _all_actions(actions):
+        inputs = action.get("inputs", {})
+        host = inputs.get("host", {}) if isinstance(inputs, dict) else {}
+        parameters = inputs.get("parameters", {}) if isinstance(inputs, dict) else {}
+        if not isinstance(host, dict) or host.get("operationId") != "UpdateOnlyRecord" or not isinstance(parameters, dict):
+            continue
+        item = parameters.get("item", "")
+        if not isinstance(item, str):
+            continue
+        present = {field for field in summary_fields if field in item}
+        if present:
+            if present != summary_fields:
+                errors.append(f"{action_name} must write all seven MQ summary fields together")
+            field_writers.add(action_name)
+    if field_writers != {
+        "Update_case_success_MQ",
+        "Update_case_mq_incomplete_diagnostic",
+    }:
+        errors.append("MQ summary fields may be written only on verified report readback or the guarded log_incomplete diagnostic branch")
+    for _, action in _all_actions(actions):
+        inputs = action.get("inputs", {})
+        host = inputs.get("host", {}) if isinstance(inputs, dict) else {}
+        if action.get("type") == "OpenApiConnection" and host.get("operationId") in {"CreateFile", "CopyDriveFileByPath", "PatchItem", "RunScriptProd"}:
+            if inputs.get("retryPolicy") != {"type": "none"}:
+                errors.append("MQ external write/script actions must disable automatic retry")
+                break
+    serialized = json.dumps(clientdata, ensure_ascii=False)
+    expected_placeholders = set(MQ_OFFICE_SCRIPT_IDS.values())
+    actual_placeholders = {value for value in MQ_OFFICE_SCRIPT_IDS.values() if value in serialized}
+    if actual_placeholders != expected_placeholders:
+        errors.append("MQ local candidate must keep all three unresolved Office Script IDs explicit")
+    return errors
+
+
+def write_mq_candidate() -> Path:
+    candidate = build_mq_candidate()
+    errors = validate_mq_candidate(candidate)
+    if errors:
+        raise ValueError("MQ local candidate failed static validation: " + "; ".join(errors))
+    output = HERE / "flow-definition.mq-local-candidate.json"
+    output.write_text(
+        json.dumps(candidate, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    return output
+
+
 def _side_effect_failure_path_errors(actions: dict[str, Any]) -> list[str]:
     """Keep uncertain copy/write outcomes fail-closed in the local WDL candidate."""
     errors: list[str] = []
@@ -1460,6 +2390,11 @@ def write_excelurl_candidate(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build local Flow definition candidates.")
     parser.add_argument(
+        "--mq-candidate",
+        action="store_true",
+        help="write a separate local MQ comparison candidate with unresolved Office Script IDs",
+    )
+    parser.add_argument(
         "--excelurl-candidate",
         action="store_true",
         help="write a separate candidate that records a verified Excel browser URL",
@@ -1469,7 +2404,17 @@ if __name__ == "__main__":
         help="HTTPS OneDrive personal-site Documents root; defaults to the T006 site",
     )
     args = parser.parse_args()
-    if args.excelurl_candidate:
+    if args.mq_candidate and args.excelurl_candidate:
+        parser.error("--mq-candidate and --excelurl-candidate cannot be combined")
+    if args.mq_candidate:
+        if args.browser_documents_root:
+            parser.error("--browser-documents-root cannot be used with --mq-candidate")
+        output = write_mq_candidate()
+        print(
+            "Generated and statically validated separate local MQ candidate "
+            f"{output.name}; Office Script IDs remain placeholders; no cloud calls made."
+        )
+    elif args.excelurl_candidate:
         output = write_excelurl_candidate(
             args.browser_documents_root or T006_BROWSER_DOCUMENTS_ROOT
         )

@@ -1,0 +1,22 @@
+{
+  "@odata.type": "Microsoft.Dynamics.CRM.MemoAttributeMetadata",
+  "AttributeType": "Memo",
+  "AttributeTypeName": {
+    "Value": "MemoType"
+  },
+  "SchemaName": "cr6cb_Mqmissingids",
+  "DisplayName": {
+    "@odata.type": "Microsoft.Dynamics.CRM.Label",
+    "LocalizedLabels": [
+      {
+        "Label": "MQ欠落ID",
+        "LanguageCode": 1041
+      }
+    ]
+  },
+  "RequiredLevel": {
+    "Value": "None"
+  },
+  "Format": "Text",
+  "MaxLength": 16384
+}

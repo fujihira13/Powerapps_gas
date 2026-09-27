@@ -1,0 +1,35 @@
+{
+  "contract_version": "mq-id-input.v1",
+  "case_name": "design-preview-5",
+  "batch_input": {
+    "sheets": [
+      {
+        "name": "Batch_Input",
+        "rows": [
+          [
+            "MQ Batch Input"
+          ],
+          [
+            "MQ_ID"
+          ],
+          [
+            "MQ-0001"
+          ],
+          [
+            "MQ-0002"
+          ],
+          [
+            "MQ-0003"
+          ],
+          [
+            "MQ-0004"
+          ],
+          [
+            "MQ-0005"
+          ]
+        ]
+      }
+    ]
+  },
+  "log_text": "処理日: 2026-09-26\n環境: 架空環境A\nサーバー: 架空サーバーA\n実行回: 9001\nINFO 08:00:00 MQ refresh started on the sample server.\nINFO 08:00:01 Loading queue definitions from local configuration.\nMQ_BOX_ID=MQ-0001\nINFO 08:00:02 Queue MQ-0001 is ready.\nMQ_BOX_ID=MQ-0002\nWARN 08:00:03 Retry count was 0; no retry was needed.\nINFO 08:00:04 MQ_BOX_STATUS=READY is not an ID.\nINFO 08:00:05 Reading the next queue group.\nMQ_BOX_ID=MQ-0004\nINFO 08:00:06 Reference code REF-9012 is not an MQ box ID.\nINFO 08:00:07 Preparing the final queue.\nMQ_BOX_ID=MQ-0005\nINFO 08:00:08 Wrote 4 queue IDs to the result log.\nINFO 08:00:09 MQ refresh batch finished.\nALL SUCCESS\n"
+}

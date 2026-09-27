@@ -1,0 +1,19 @@
+処理日: 2026-09-27
+環境: 架空環境A
+サーバー: 架空サーバーA
+実行回: 92701
+INFO 08:00:00 MQ refresh started on the sample server.
+INFO 08:00:01 Loading queue definitions from local configuration.
+MQ_BOX_ID=MQ-0001
+INFO 08:00:02 Queue MQ-0001 is ready.
+MQ_BOX_ID=MQ-0002
+WARN 08:00:03 Retry count was 0; no retry was needed.
+INFO 08:00:04 MQ_BOX_STATUS=READY is not an ID.
+INFO 08:00:05 Reading the next queue group.
+MQ_BOX_ID=MQ-0004
+INFO 08:00:06 Reference code REF-9012 is not an MQ box ID.
+INFO 08:00:07 Preparing the final queue.
+MQ_BOX_ID=MQ-0005
+INFO 08:00:08 Wrote 4 queue IDs to the result log.
+INFO 08:00:09 MQ refresh batch finished.
+ALL SUCCESS

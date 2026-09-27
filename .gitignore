@@ -47,3 +47,23 @@ outputs/canvas-c08-post-save-readback-20260926/
 outputs/canvas-portfolio-precompile-live-20260926/
 outputs/canvas-portfolio-postcompile-readback-20260926/
 outputs/canvas-portfolio-postsave-readback-20260926/
+
+# Live MQ flow snapshots can contain connection references and stay local
+outputs/mq-cloud-20260927/
+
+# Transient MQ Canvas syncs and generated script wrappers; source candidates stay tracked
+outputs/canvas-mq-current-20260927/
+outputs/canvas-mq-compiled-readback-20260927/
+outputs/canvas-mq-session-check*-20260927/
+outputs/canvas-mq-after-compile-20260927/
+outputs/canvas-mq-post-save-check-20260927/
+outputs/canvas-mq-new-window-check-20260927/
+outputs/canvas-mq-layout-readback-20260927/
+outputs/canvas-mq-card-diagnostic-readback-20260927/
+outputs/canvas-mq-live-sync-20260927/
+outputs/canvas-mq-native-attachments-readback-20260927/
+outputs/flow-implementation/osts-candidates-metadata-v2/
+
+# Generated MQ definitions include live connection references; rebuild locally
+outputs/flow-implementation/flow-definition.mq-local-candidate.json
+outputs/flow-implementation/office-scripts/osts-candidates/

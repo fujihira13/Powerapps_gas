@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mq-id-result.v1.schema.json",
+  "title": "MQ ID comparison result",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "status",
+    "comparison_available",
+    "end_marker_present",
+    "expected_ids",
+    "logged_ids",
+    "missing_ids",
+    "log_only_ids",
+    "counts",
+    "duplicate_ids",
+    "invalid",
+    "errors",
+    "presentation"
+  ],
+  "properties": {
+    "contract_version": { "const": "mq-id-result.v1" },
+    "status": { "enum": ["input_error", "log_incomplete", "comparison_ready"] },
+    "comparison_available": { "type": "boolean" },
+    "end_marker_present": { "type": "boolean" },
+    "expected_ids": { "type": "array", "items": { "type": "string" } },
+    "logged_ids": { "type": "array", "items": { "type": "string" } },
+    "missing_ids": {
+      "oneOf": [
+        { "type": "array", "items": { "type": "string" } },
+        { "type": "null" }
+      ]
+    },
+    "log_only_ids": {
+      "oneOf": [
+        { "type": "array", "items": { "type": "string" } },
+        { "type": "null" }
+      ]
+    },
+    "counts": {
+      "type": "object",
+      "required": ["expected", "logged", "missing", "log_only"],
+      "properties": {
+        "expected": { "type": "integer", "minimum": 0 },
+        "logged": { "type": "integer", "minimum": 0 },
+        "missing": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+        "log_only": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] }
+      }
+    },
+    "duplicate_ids": {
+      "type": "object",
+      "required": ["expected", "logged"],
+      "properties": {
+        "expected": { "type": "array", "items": { "type": "string" } },
+        "logged": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "invalid": {
+      "type": "object",
+      "required": ["expected_rows", "log_lines"],
+      "properties": {
+        "expected_rows": { "type": "array", "items": { "type": "object" } },
+        "log_lines": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "errors": { "type": "array", "items": { "type": "object" } },
+    "presentation": {
+      "type": "object",
+      "required": ["status_label", "stop_processing", "stop_reason", "human_decision_required"],
+      "properties": {
+        "status_label": { "enum": ["要確認", "比較完了"] },
+        "stop_processing": { "type": "boolean" },
+        "stop_reason": {
+          "oneOf": [
+            { "enum": ["input_error", "missing_end_marker"] },
+            { "type": "null" }
+          ]
+        },
+        "human_decision_required": { "const": true }
+      }
+    }
+  }
+}
