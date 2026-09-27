@@ -1,0 +1,9 @@
+{
+  "entity_set": "cr6cb_evidencefiles",
+  "primary_id": "cr6cb_evidencefileid",
+  "parent_lookup_filter": "_cr6cb_evidencecase_value",
+  "role_column": "cr6cb_filerole",
+  "file_name_column": "cr6cb_filename",
+  "log_role_value": "log",
+  "excel_role_value": "excel"
+}

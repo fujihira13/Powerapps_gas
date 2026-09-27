@@ -1,5 +1,26 @@
 {
   "status": "The Developer flow is active; the no-run MQ path passed one approved end-to-end case after a datetime readback fix. See docs/TASKS.md T-014 for the first unresolved case and full evidence.",
+  "mq_two_file_local_candidate": {
+    "status": "Reflected to the active Developer flow on 2026-09-28; definition GET matched the candidate. One approved two-file case completed and its workbook was read back.",
+    "trigger_contract": "The flow still receives only the parent caseId.",
+    "source_contract": "Query cr6cb_evidencefiles by the parent lookup, identify one excel row and one log row by cr6cb_filerole, then retrieve exactly one Notes attachment for each child row.",
+    "confirmed_schema": {
+      "entity_set": "cr6cb_evidencefiles",
+      "primary_id": "cr6cb_evidencefileid",
+      "parent_lookup_filter": "_cr6cb_evidencecase_value",
+      "role_column": "cr6cb_filerole",
+      "file_name_column": "cr6cb_filename",
+      "role_values": ["excel", "log"]
+    },
+    "duplicate_protection": "The parent-plus-role alternate key cr6cb_case_filerole is active. The flow also requires exactly two child rows and one row per role before it reaches the Excel creation path.",
+    "static_checks": "36 tests in test_flow_definition.py passed on 2026-09-28; candidate generation and local static validation passed.",
+    "verified_runtime": "Approved case ed89fb2c-bfba-f111-b377-7ced8d3141aa: two role-specific child records and attachments were saved; the flow reached 転記済み / 全文一致, and the result workbook contained Evidence and MQ_Comparison with 5 expected, 4 logged, 1 missing (MQ-0003).",
+    "not_verified": [
+      "Power Automate Designer visual validation",
+      "Missing-file, same-name warning, save/readback failure, zero-difference, and missing-end-marker runtime paths",
+      "A second case or concurrent execution"
+    ]
+  },
   "scope": [
     "Power Apps (V2) caseId input",
     "Read one case and require processingstatus=開始受付済み",

@@ -15,6 +15,7 @@ Developer環境のPower Apps (V2)からDataverseの対象1件を受け取り、�
 - `workflow-create-body.json`: Dataverse Web API `POST /api/data/v9.2/workflows`に渡す純粋なworkflowオブジェクト。`clientdata`はJSON文字列です。
 - `flow-definition.candidate.json`: 1件受付・実行回なし化の通常経路を含むローカルWDL `clientdata`。MQ経路を含む稼働版全体とは異なります。
 - `flow-definition.mq-local-candidate.json`: 同じ変更をMQ経路へ含め、保存済み稼働フローからOffice Scriptの3つの`scriptId`だけを引き継いだローカル候補。接続参照を含む生成物のためGit管理から除外し、`python outputs/flow-implementation/build_flow_definition.py --mq-candidate --mq-script-id-source outputs/runless-migration-20260927/flow-before.json`で再生成します。
+- `mq-child-attachment-schema.json`: 2ファイル受付用の子テーブル論理名、親LookupのODataフィルター名、役割列・ファイル名列、役割値。フロー生成コードへ環境固有の列名を埋め込まず、Dataverseの実スキーマと設定を照合できるようにします。
 - `flow-definition.excelurl-c02-local-candidate.json`: Excel URL／読戻し経路にC02の具体的な入力異常理由・実在日付検査・添付本文読取失敗時の停止記録を加えた定義。条件付きPATCH後の稼働定義と直後GETで完全一致を確認済みです。
 - `workflow-create-api-request.json`: 宛先と送信bodyを含むローカルプレビュー。送信機能はありません。
 - `flow-candidate-status.json`: 実装範囲、確認済み事項、制限と未確認事項。
@@ -31,6 +32,14 @@ Developer環境のPower Apps (V2)からDataverseの対象1件を受け取り、�
 5. Excelの`Evidence`表にあるひな形行を置換し、値を読み戻して照合します。読戻しが0行だった場合だけ10秒後に1回、読取専用で再照会します。1行の9項目がすべて一致した場合だけ状態を`転記済み`、確認結果を`全文一致`にします。再照会でも確認できなければ`結果不明`です。
 
 コピー前の検査不合格は理由とともに`停止`を記録します。無効暦日・日付行欠落・サーバー識別情報欠落の3ケースは、反映後の実機で具体的な停止理由とExcel未作成を確認しました。コピー以降の失敗・読戻し不一致は`結果不明`とし、OneDrive／Excelを確認するまで再実行しません。読戻し一致の成功分岐だけで既存ファイルの直接URLを`excelurl`へ記録し、共有リンクは作りません。反映後の正常回帰A/A/run102では添付1件・177Bから`転記済み`／`全文一致`、Excel URL、結果Excel 1冊・8,265B、Evidence 9列・1行とログ全文一致を実機確認しました。添付本文読取失敗・タイムアウト、異常と正常の混在、C03・C04・C08・C09の復旧条件は未確認または未実装です。
+
+## MQ 2ファイル候補（定義反映済み・実行未確認）
+
+2026-09-28に、承認済み実装計画に沿ってローカルのMQフロー候補を更新しました。新方式では、親案件GUIDに結び付く`cr6cb_evidencefiles`子行から`log`と`excel`を役割値で識別し、各子行GUIDに関連するNotes添付を別々に取得します。子行が2行で役割別に1行ずつあること、各子行にNotes添付が1件だけあること、子行とNotesのファイル名が一致すること、拡張子と本文が有効であることを確認してから、既存のID比較・結果Excel処理へ渡します。子行・役割・添付の不足や重複、名前・拡張子・本文の不整合があれば、結果Excelを作成しません。
+
+この候補は従来どおり親Notes添付1件の経路を残し、2ファイル方式を別分岐にしています。フロー引数は`caseId`だけです。`mq-child-attachment-schema.json`には、読戻しで確認されたテーブル`cr6cb_evidencefile`（コレクション`cr6cb_evidencefiles`）、主キー`cr6cb_evidencefileid`、親Lookup `cr6cb_evidencecase`、役割`cr6cb_filerole`（`log`／`excel`）、ファイル名`cr6cb_filename`を設定しています。親＋役割キー`cr6cb_case_filerole`はDataverseの画面でアクティブを確認しました。フロー自体も子行が正確に2行であることと役割ごとに1行であることを確認し、重複時は結果Excel作成前に停止します。
+
+2026-09-28、既存フローへETag付きで反映し、HTTP 204と直後GETの定義完全一致・有効状態を確認しました。更新前後の定義と差分は`outputs/mq-two-files-20260928/`に記録しています。新テーブルに対するNotes読取を含む実行時確認とPower Automate Designer検証はまだ行っていません。
 
 ## 制限
 

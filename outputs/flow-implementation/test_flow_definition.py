@@ -108,26 +108,46 @@ class FlowDefinitionTests(unittest.TestCase):
         )
 
     def test_mq_candidate_validates_one_txt_and_one_xlsx_then_reads_batch_workbook(self):
-        from build_flow_definition import build_mq_candidate
+        from build_flow_definition import build_mq_candidate, load_mq_child_attachment_schema
 
         actions = build_mq_candidate()["properties"]["definition"]["actions"]
+        schema = load_mq_child_attachment_schema()
+        self.assertEqual(schema.entity_set, "cr6cb_evidencefiles")
+        self.assertEqual(schema.primary_id, "cr6cb_evidencefileid")
+        self.assertEqual(schema.parent_lookup_filter, "_cr6cb_evidencecase_value")
+        self.assertEqual(schema.role_column, "cr6cb_filerole")
+        self.assertEqual(schema.file_name_column, "cr6cb_filename")
+        self.assertEqual((schema.log_role_value, schema.excel_role_value), ("log", "excel"))
+        self.assertTrue(schema.is_resolved())
+        child_rows = find_action(actions, "List_MQ_File_Rows")
         role_gate = find_action(actions, "Condition_MQ_Attachment_Roles")
         log_filter = find_action(actions, "Filter_MQ_Logs")
         book_filter = find_action(actions, "Filter_MQ_Books")
+        log_notes = find_action(actions, "List_MQ_Log_Notes")
+        book_notes = find_action(actions, "List_MQ_Book_Notes")
         stage = find_action(actions, "Stage_MQ_Input")
         reader = find_action(actions, "Run_MQ_Input_Validation")
         self.assertIsNotNone(role_gate)
         serialized = json.dumps(actions)
+        self.assertEqual(child_rows["inputs"]["parameters"]["entityName"], schema.entity_set)
+        self.assertIn("outputs('Compose_CaseId')", child_rows["inputs"]["parameters"]["$filter"])
+        self.assertEqual(child_rows["inputs"]["parameters"]["$top"], 3)
         self.assertIn("equals(length(body('Filter_MQ_Logs')),1)", json.dumps(role_gate))
         self.assertIn("equals(length(body('Filter_MQ_Books')),1)", json.dumps(role_gate))
-        self.assertNotIn("body('Filter_MQ_Logs')?['value']", serialized)
-        self.assertNotIn("body('Filter_MQ_Books')?['value']", serialized)
-        self.assertIn(".txt", log_filter["inputs"]["where"])
-        self.assertIn(".xlsx", book_filter["inputs"]["where"])
-        self.assertIn("first(body('Filter_MQ_Logs'))?['documentbody']", serialized)
-        self.assertIn("first(body('Filter_MQ_Logs'))?['filename']", serialized)
+        self.assertIn("equals(length(body('List_MQ_Log_Notes')?['value']),1)", json.dumps(role_gate))
+        self.assertIn("equals(length(body('List_MQ_Book_Notes')?['value']),1)", json.dumps(role_gate))
+        self.assertIn("endsWith(toLower", json.dumps(role_gate))
+        self.assertIn("equals(first(body('Filter_MQ_Logs'))?['", json.dumps(role_gate))
+        self.assertEqual(log_filter["inputs"]["from"], "@body('List_MQ_File_Rows')?['value']")
+        self.assertEqual(book_filter["inputs"]["from"], "@body('List_MQ_File_Rows')?['value']")
+        self.assertIn(schema.log_role_value, log_filter["inputs"]["where"])
+        self.assertIn(schema.excel_role_value, book_filter["inputs"]["where"])
+        self.assertIn(schema.primary_id, log_notes["inputs"]["parameters"]["$filter"])
+        self.assertIn(schema.primary_id, book_notes["inputs"]["parameters"]["$filter"])
+        self.assertIn("first(body('List_MQ_Log_Notes')?['value'])?['documentbody']", serialized)
+        self.assertIn("first(body('List_MQ_Log_Notes')?['value'])?['filename']", serialized)
         self.assertEqual(stage["inputs"]["host"]["operationId"], "CreateFile")
-        self.assertIn("first(body('Filter_MQ_Books'))?['documentbody']", json.dumps(stage))
+        self.assertIn("first(body('List_MQ_Book_Notes')?['value'])?['documentbody']", json.dumps(stage))
         self.assertEqual(stage["inputs"]["retryPolicy"], {"type": "none"})
         self.assertEqual(reader["inputs"]["host"]["operationId"], "RunScriptProd")
         self.assertIn("__SELECT_MQ_BATCH_READER_SCRIPT__", reader["inputs"]["parameters"]["scriptId"])
@@ -143,6 +163,64 @@ class FlowDefinitionTests(unittest.TestCase):
         self.assertIn("Update_case_mq_incomplete_diagnostic", incomplete_gate["actions"])
         self.assertIn("Update_case_stop_mq_input_invalid", incomplete_gate["else"]["actions"])
         self.assertIn("result_text", find_action(actions, "Update_case_mq_incomplete_diagnostic")["inputs"]["parameters"]["item"])
+
+    def test_mq_child_attachment_schema_values_are_configured_and_notes_are_role_bound(self):
+        from build_flow_definition import (
+            MqChildAttachmentSchema,
+            build_mq_candidate,
+            validate_mq_candidate,
+        )
+
+        schema = MqChildAttachmentSchema(
+            entity_set="cr6cb_evidencefiles",
+            primary_id="cr6cb_evidencefileid",
+            parent_lookup_filter="_cr6cb_evidencecase_value",
+            role_column="cr6cb_filerole",
+            file_name_column="cr6cb_filename",
+            log_role_value="log",
+            excel_role_value="excel",
+        )
+        candidate = build_mq_candidate(attachment_schema=schema)
+        actions = candidate["properties"]["definition"]["actions"]
+        self.assertEqual(validate_mq_candidate(candidate, attachment_schema=schema), [])
+        child_rows = find_action(actions, "List_MQ_File_Rows")
+        self.assertEqual(child_rows["inputs"]["parameters"]["entityName"], schema.entity_set)
+        self.assertEqual(
+            child_rows["inputs"]["parameters"]["$filter"],
+            "@concat('_cr6cb_evidencecase_value eq ',outputs('Compose_CaseId'))",
+        )
+        log_notes = find_action(actions, "List_MQ_Log_Notes")
+        book_notes = find_action(actions, "List_MQ_Book_Notes")
+        self.assertIn("first(body('Filter_MQ_Logs'))?['cr6cb_evidencefileid']", log_notes["inputs"]["parameters"]["$filter"])
+        self.assertIn("first(body('Filter_MQ_Books'))?['cr6cb_evidencefileid']", book_notes["inputs"]["parameters"]["$filter"])
+
+        # Swapping a child-row reference would attach one role's Notes query to
+        # the other role and must fail static validation.
+        book_notes["inputs"]["parameters"]["$filter"] = log_notes["inputs"]["parameters"]["$filter"]
+        self.assertTrue(
+            any("corresponding child row GUID" in error for error in validate_mq_candidate(candidate, attachment_schema=schema))
+        )
+
+    def test_mq_child_row_and_attachment_failures_stop_before_result_creation(self):
+        from build_flow_definition import build_mq_candidate, validate_mq_candidate
+
+        candidate = build_mq_candidate()
+        actions = candidate["properties"]["definition"]["actions"]
+        one_note = find_action(actions, "Condition_One_Note")
+        one_note["else"]["actions"].pop("Update_case_mq_child_rows_unknown")
+        errors = validate_mq_candidate(candidate)
+        self.assertTrue(any("Update_case_mq_child_rows_unknown" in error for error in errors), errors)
+
+        candidate = build_mq_candidate()
+        actions = candidate["properties"]["definition"]["actions"]
+        two_rows = find_action(actions, "Condition_Two_Attachments")
+        two_rows["else"]["actions"].pop("Update_case_stop_no_note")
+        errors = validate_mq_candidate(candidate)
+        self.assertTrue(any("Update_case_stop_no_note" in error for error in errors), errors)
+
+        role_gate = find_action(actions, "Condition_MQ_Attachment_Roles")
+        self.assertIn("Update_case_stop_mq_roles", role_gate["else"]["actions"])
+        self.assertNotIn("Copy_template_MQ", json.dumps(role_gate["else"]["actions"]))
 
     def test_mq_candidate_inherits_exact_three_script_ids_from_saved_flow_get(self):
         from build_flow_definition import (

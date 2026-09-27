@@ -76,8 +76,29 @@ outputs/runless-migration-20260927/flow-before-readback-fix.json
 outputs/runless-migration-20260927/flow-after-datetime-fix.json
 outputs/runless-migration-20260927/flow-datetime-patch-body.json
 
+# Live MQ two-file flow snapshots and request body include environment connection references
+outputs/mq-two-files-20260928/flow-before.json
+outputs/mq-two-files-20260928/flow-after.json
+outputs/mq-two-files-20260928/patch-body.json
+outputs/mq-two-files-20260928/etag.txt
+
 # Temporary Canvas probes and duplicate authoring readbacks
 outputs/canvas-runless-legacy-probe-20260927/
 outputs/runless-migration-20260927/canvas-pre-save-readback/
 outputs/runless-migration-20260927/canvas-date-probe-readback/
 outputs/runless-migration-20260927/canvas-after-card-fix-readback/
+
+# Duplicate Canvas snapshots; the maintained one-action source is tracked separately
+outputs/canvas-front-copy-scroll-20260927/
+outputs/canvas-front-readback-20260927/
+outputs/canvas-ui-readability-20260927/
+outputs/canvas-mq-isolation-20260928/
+outputs/canvas-mq-one-action-baseline-20260928/
+outputs/canvas-mq-one-action-durable-20260928/
+outputs/canvas-mq-one-action-durable-final-20260928/
+outputs/canvas-mq-one-action-durable-final2-20260928/
+outputs/canvas-mq-one-action-readback-20260928/
+outputs/canvas-mq-one-action-saved-readback-20260928/
+
+# Generated flow comparison paths; source builder and explanatory notes are tracked
+outputs/mq-two-files-20260928/diff-paths.txt

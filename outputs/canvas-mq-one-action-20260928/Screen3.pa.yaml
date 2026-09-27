@@ -1,0 +1,505 @@
+Screens:
+  Screen3:
+    Properties:
+      Fill: =RGBA(243, 246, 250, 1)
+      LoadingSpinnerColor: =RGBA(0, 96, 160, 1)
+      OnVisible: =Refresh('件別ファイル'); Reset(radCaseCompare); Reset(radCaseJudgment); Reset(txtCaseComment); Set(varCaseEditsPending, false); Set(varCaseReturnNeedsSave, varEvidenceCase.cr6cb_reviewstatus = "差し戻し")
+    Children:
+      - lblCaseTitle:
+          Control: Label
+          Properties:
+            Color: =RGBA(25, 54, 92, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Bold
+            Height: =52
+            Size: =28
+            Text: ="ログと結果の確認"
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =18
+      - lblCaseIdentity:
+          Control: Label
+          Properties:
+            Color: =RGBA(42, 57, 75, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Height: =88
+            Size: =14
+            Text: |-
+              =Coalesce(varEvidenceCase.cr6cb_caselabel, "—") & " / " & If(IsBlank(varEvidenceCase.cr6cb_targetdate), "—", Text(varEvidenceCase.cr6cb_targetdate, "[$-ja-JP]yyyy-mm-dd")) &
+              Char(10) & "環境: " & Substitute(Coalesce(varEvidenceCase.cr6cb_environment, "—"), "架空", "") & " / サーバー: " & Substitute(Coalesce(varEvidenceCase.cr6cb_server, "—"), "架空", "") &
+              Char(10) & If(
+                IsBlank(varEvidenceCase.createdon),
+                "受付日時: —",
+                "受付日時: " & Text(
+                  DateAdd(
+                    DateAdd(varEvidenceCase.createdon, TimeZoneOffset(varEvidenceCase.createdon), TimeUnit.Minutes),
+                    9,
+                    TimeUnit.Hours
+                  ),
+                  "[$-ja-JP]yyyy-mm-dd hh:mm:ss"
+                ) & " JST"
+              ) &
+              Char(10) & If(IsBlank(varEvidenceCase.cr6cb_evidencecaseid), "件ID: —", "件ID: " & Text(varEvidenceCase.cr6cb_evidencecaseid))
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =72
+      - lblCaseLogHeading:
+          Control: Label
+          Properties:
+            Color: =RGBA(25, 54, 92, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Height: =28
+            Size: =16
+            Text: =If(IsBlank(varEvidenceCase.cr6cb_batchfilename), "過去の添付ファイル", "照合に使用したファイル")
+            Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+            X: =24
+            Y: =174
+      - frmCaseSourceLog:
+          Control: Form
+          Variant: Classic
+          Layout: Vertical
+          Properties:
+            DataSource: ='架空ログ証跡件'
+            DefaultMode: =FormMode.View
+            Height: =Max(80, CountRows(varEvidenceCase.Attachments) * 58 + 24)
+            Item: =LookUp('架空ログ証跡件', cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid)
+            NumberOfColumns: =1
+            Visible: =CountRows(Filter('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid)) = 0
+            Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+            X: =24
+            Y: =206
+          Children:
+            - attCaseSourceLog_DataCard:
+                Control: TypedDataCard
+                Variant: ClassicAttachmentsEdit
+                IsLocked: true
+                Properties:
+                  BorderColor: =RGBA(245, 245, 245, 1)
+                  DataField: ="{Attachments}"
+                  Default: =ThisItem.Attachments
+                  DisplayName: ="元ログ"
+                  Height: =Parent.Height
+                  Required: =true
+                  Update: =ThisItem.Attachments
+                  Width: =647
+                  X: =0
+                  Y: =0
+                Children:
+                  - attCaseSourceLog:
+                      Control: Attachments
+                      MetadataKey: FieldValue
+                      Properties:
+                        AccessibleLabel: ="元ログ"
+                        DisplayMode: =DisplayMode.View
+                        Height: =Parent.Height
+                        Items: =ThisItem.Attachments
+                        Items.Name: =DisplayName
+                        Items.Value: =Id
+                        Width: =Parent.Width - 12
+                        X: =6
+      - s03OneLogHeading:
+          Control: Label
+          Properties:
+            Color: =RGBA(25, 54, 92, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Height: =26
+            Size: =13
+            Text: ="サーバーログ（txt）"
+            Visible: =CountIf('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid && cr6cb_filerole = "log") = 1
+            Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+            X: =24
+            Y: =206
+      - s03OneLogForm:
+          Control: Form
+          Variant: Classic
+          Layout: Vertical
+          Properties:
+            DataSource: ='件別ファイル'
+            DefaultMode: =FormMode.View
+            Height: =58
+            Item: =LookUp('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid && cr6cb_filerole = "log")
+            NumberOfColumns: =1
+            Visible: =!IsBlank(LookUp('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid && cr6cb_filerole = "log").cr6cb_evidencefileid)
+            Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+            X: =24
+            Y: =234
+          Children:
+            - s03OneLogAttachmentCard:
+                Control: TypedDataCard
+                Variant: ClassicAttachmentsEdit
+                IsLocked: true
+                Properties:
+                  DataField: ="{Attachments}"
+                  Default: =ThisItem.Attachments
+                  DisplayName: ="サーバーログ（txt）"
+                  Height: =Parent.Height
+                  Required: =false
+                  Update: =ThisItem.Attachments
+                  Width: =Parent.Width
+                  X: =0
+                  Y: =0
+                Children:
+                  - s03OneLogAttachment:
+                      Control: Attachments
+                      MetadataKey: FieldValue
+                      Properties:
+                        AccessibleLabel: ="サーバーログ（txt）"
+                        DisplayMode: =DisplayMode.View
+                        Height: =Parent.Height
+                        Items: =ThisItem.Attachments
+                        Items.Name: =DisplayName
+                        Items.Value: =Id
+                        Width: =Parent.Width - 12
+                        X: =6
+      - s03OneExcelHeading:
+          Control: Label
+          Properties:
+            Color: =RGBA(25, 54, 92, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Height: =26
+            Size: =13
+            Text: ="更新対象一覧（Excel）"
+            Visible: =CountIf('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid && cr6cb_filerole = "excel") = 1
+            Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+            X: =24
+            Y: =298
+      - s03OneExcelForm:
+          Control: Form
+          Variant: Classic
+          Layout: Vertical
+          Properties:
+            DataSource: ='件別ファイル'
+            DefaultMode: =FormMode.View
+            Height: =58
+            Item: =LookUp('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid && cr6cb_filerole = "excel")
+            NumberOfColumns: =1
+            Visible: =!IsBlank(LookUp('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid && cr6cb_filerole = "excel").cr6cb_evidencefileid)
+            Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+            X: =24
+            Y: =326
+          Children:
+            - s03OneExcelAttachmentCard:
+                Control: TypedDataCard
+                Variant: ClassicAttachmentsEdit
+                IsLocked: true
+                Properties:
+                  DataField: ="{Attachments}"
+                  Default: =ThisItem.Attachments
+                  DisplayName: ="更新対象一覧（Excel）"
+                  Height: =Parent.Height
+                  Required: =false
+                  Update: =ThisItem.Attachments
+                  Width: =Parent.Width
+                  X: =0
+                  Y: =0
+                Children:
+                  - s03OneExcelAttachment:
+                      Control: Attachments
+                      MetadataKey: FieldValue
+                      Properties:
+                        AccessibleLabel: ="更新対象一覧（Excel）"
+                        DisplayMode: =DisplayMode.View
+                        Height: =Parent.Height
+                        Items: =ThisItem.Attachments
+                        Items.Name: =DisplayName
+                        Items.Value: =Id
+                        Width: =Parent.Width - 12
+                        X: =6
+      - lnkCaseEvidenceExcel:
+          Control: ModernLink
+          Properties:
+            AccessibleLabel: ="証跡Excel"
+            DisplayMode: |-
+              =If(
+                IsBlank(varEvidenceCase.cr6cb_excelurl) ||
+                varEvidenceCase.cr6cb_processingstatus <> "転記済み" ||
+                varEvidenceCase.cr6cb_excelcheckstatus <> "全文一致" ||
+                !(
+                  (CountRows(Filter('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid)) = 0 && CountIf(varEvidenceCase.Attachments, EndsWith(Lower(DisplayName), ".xlsx")) = 1) ||
+                  (CountIf('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid && cr6cb_filerole = "log") = 1 && CountIf('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid && cr6cb_filerole = "excel") = 1)
+                ),
+                DisplayMode.Disabled,
+                DisplayMode.Edit
+              )
+            Text: =If(IsBlank(varEvidenceCase.cr6cb_excelurl), "結果Excel（読戻し確認後に表示）", "結果Excel")
+            URL: =varEvidenceCase.cr6cb_excelurl
+            Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+            X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+            Y: =If(Parent.Width >= 900, 206, 344)
+      - lblCaseExcelCheck:
+          Control: Label
+          Properties:
+            Color: =RGBA(42, 57, 75, 1)
+            Font: =Font.'Segoe UI'
+            Height: =108
+            Size: =14
+            Text: |-
+              ="結果Excel: " & If(varEvidenceCase.cr6cb_processingstatus = "転記済み" && varEvidenceCase.cr6cb_excelcheckstatus = "全文一致", "内容の読戻しを確認済み", "未確認") &
+              If(IsBlank(varEvidenceCase.cr6cb_batchfilename), "", Char(10) &
+                If(
+                  varEvidenceCase.cr6cb_mqterminalstatus = "なし",
+                  "ログが最後まで出力されたことを確認できません",
+                  If(
+                    varEvidenceCase.cr6cb_processingstatus = "転記済み" &&
+                    varEvidenceCase.cr6cb_excelcheckstatus = "全文一致" &&
+                    varEvidenceCase.cr6cb_mqterminalstatus = "あり" &&
+                    varEvidenceCase.cr6cb_mqcomparisonstatus = "一致" &&
+                    !IsBlank(varEvidenceCase.cr6cb_excelurl) &&
+                    (
+                      (CountRows(Filter('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid)) = 0 && CountIf(varEvidenceCase.Attachments, EndsWith(Lower(DisplayName), ".xlsx")) = 1) ||
+                      (CountIf('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid && cr6cb_filerole = "log") = 1 && CountIf('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid && cr6cb_filerole = "excel") = 1)
+                    ) &&
+                    CountRows(Filter(Split(Coalesce(varEvidenceCase.cr6cb_mqresulttext, ""), Char(10)), "ログ未記録" in Value || "予定外ID" in Value)) = 0,
+                    "予定したIDはすべてログに記録されています",
+                    If(
+                      varEvidenceCase.cr6cb_processingstatus = "転記済み" && varEvidenceCase.cr6cb_excelcheckstatus = "全文一致",
+                      "照合差異があります。下のIDを確認してください",
+                      "照合結果を確認中です"
+                    )
+                  )
+                ) & Char(10) &
+                "予定 " & If(IsBlank(varEvidenceCase.cr6cb_mqexpectedcount), "—", Text(varEvidenceCase.cr6cb_mqexpectedcount, "0")) &
+                "件 / ログ記録 " & If(IsBlank(varEvidenceCase.cr6cb_mqloggedcount), "—", Text(varEvidenceCase.cr6cb_mqloggedcount, "0")) &
+                "件 / 差異 " & Text(CountRows(Filter(Split(Coalesce(varEvidenceCase.cr6cb_mqresulttext, ""), Char(10)), "ログ未記録" in Value || "予定外ID" in Value)), "0") & "件"
+              )
+            Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+            X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+            Y: =If(Parent.Width >= 900, 244, 378)
+      - galCaseMqResults:
+          Control: Gallery
+          Variant: Vertical
+          Properties:
+            AccessibleLabel: ="ログと更新対象一覧の差異（一覧内をスクロール）"
+            Height: =Min(280, Max(80, CountRows(Filter(Split(Coalesce(varEvidenceCase.cr6cb_mqresulttext, ""), Char(10)), "ログ未記録" in Value || "予定外ID" in Value)) * 32))
+            Items: =Filter(Split(Coalesce(varEvidenceCase.cr6cb_mqresulttext, ""), Char(10)), "ログ未記録" in Value || "予定外ID" in Value)
+            TemplateSize: =28
+            Visible: =!IsBlank(varEvidenceCase.cr6cb_batchfilename) && CountRows(Filter(Split(Coalesce(varEvidenceCase.cr6cb_mqresulttext, ""), Char(10)), "ログ未記録" in Value || "予定外ID" in Value)) > 0
+            Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+            X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+            Y: =lblCaseExcelCheck.Y + lblCaseExcelCheck.Height + 8
+          Children:
+            - lblCaseMqResultRow:
+                Control: Label
+                Properties:
+                  Color: =RGBA(42, 57, 75, 1)
+                  Font: =Font.'Segoe UI'
+                  Height: =28
+                  Size: =14
+                  Text: =First(Split(ThisItem.Value, Char(9))).Value & " — " & If("予定外ID" in ThisItem.Value, "一覧にないIDがログにあります", "ログに記録されていないID")
+                  Width: =Parent.TemplateWidth - 8
+                  X: =4
+      - lblCaseFailure:
+          Control: Label
+          Properties:
+            AutoHeight: =true
+            Color: =RGBA(163, 38, 45, 1)
+            Font: =Font.'Segoe UI'
+            Height: =30
+            Text: =varEvidenceCase.cr6cb_failurereason
+            Visible: =!IsBlank(varEvidenceCase.cr6cb_failurereason)
+            Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+            X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+            Y: =galCaseMqResults.Y + galCaseMqResults.Height + 8
+      - lblCaseReviewStatus:
+          Control: Label
+          Properties:
+            Color: =RGBA(42, 57, 75, 1)
+            Font: =Font.'Segoe UI'
+            Height: =30
+            Text: |-
+              ="レビュー依頼状態: " & Coalesce(varEvidenceCase.cr6cb_reviewstatus, "未依頼")
+            Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+            X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+            Y: =If(lblCaseFailure.Visible, lblCaseFailure.Y + lblCaseFailure.Height + 8, galCaseMqResults.Y + galCaseMqResults.Height + 8)
+      - lblCaseCompareHeading:
+          Control: Label
+          Properties:
+            Color: =RGBA(25, 54, 92, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Height: =26
+            Size: =16
+            Text: ="転記内容の照合"
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =If(Parent.Width >= 900, 398, 482)
+      - radCaseCompare:
+          Control: ModernRadio
+          Properties:
+            AccessibleLabel: ="転記内容の照合"
+            Default: |-
+              =If(varEvidenceCase.cr6cb_processingstatus = "転記済み" && varEvidenceCase.cr6cb_excelcheckstatus = "全文一致" && !IsBlank(varEvidenceCase.cr6cb_transfercheck), {Value: varEvidenceCase.cr6cb_transfercheck}, Blank())
+            DisplayMode: =If(varDemoRole = "担当者役" && CountIf('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid) = 2 && varEvidenceCase.cr6cb_processingstatus = "転記済み" && varEvidenceCase.cr6cb_excelcheckstatus = "全文一致" && varEvidenceCase.cr6cb_reviewstatus <> "依頼中" && varEvidenceCase.cr6cb_reviewstatus <> "再依頼" && varEvidenceCase.cr6cb_reviewstatus <> "確認済み", DisplayMode.Edit, DisplayMode.Disabled)
+            Height: =44
+            Items: =["一致", "不一致", "確認保留"]
+            Layout: =OptionLayout.Horizontal
+            OnChange: =Set(varCaseEditsPending, true)
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =If(Parent.Width >= 900, 426, 510)
+      - lblCaseJudgmentHeading:
+          Control: Label
+          Properties:
+            Color: =RGBA(25, 54, 92, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Height: =26
+            Size: =16
+            Text: ="処理結果の判断"
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =If(Parent.Width >= 900, 474, 540)
+      - radCaseJudgment:
+          Control: ModernRadio
+          Properties:
+            AccessibleLabel: ="処理結果の判断"
+            Default: |-
+              =If(varEvidenceCase.cr6cb_processingstatus = "転記済み" && varEvidenceCase.cr6cb_excelcheckstatus = "全文一致" && !IsBlank(varEvidenceCase.cr6cb_outcomejudgment), {Value: varEvidenceCase.cr6cb_outcomejudgment}, Blank())
+            DisplayMode: =If(varDemoRole = "担当者役" && CountIf('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid) = 2 && varEvidenceCase.cr6cb_processingstatus = "転記済み" && varEvidenceCase.cr6cb_excelcheckstatus = "全文一致" && varEvidenceCase.cr6cb_reviewstatus <> "依頼中" && varEvidenceCase.cr6cb_reviewstatus <> "再依頼" && varEvidenceCase.cr6cb_reviewstatus <> "確認済み", DisplayMode.Edit, DisplayMode.Disabled)
+            Height: =44
+            Items: =["正常", "異常", "判断保留"]
+            Layout: =OptionLayout.Horizontal
+            OnChange: =Set(varCaseEditsPending, true)
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =If(Parent.Width >= 900, 502, 568)
+      - lblCaseCommentHeading:
+          Control: Label
+          Properties:
+            Color: =RGBA(25, 54, 92, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Height: =26
+            Size: =16
+            Text: ="コメント"
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =If(Parent.Width >= 900, 550, 598)
+      - txtCaseComment:
+          Control: ModernTextInput
+          Properties:
+            AccessibleLabel: ="コメント"
+            Default: =If(varEvidenceCase.cr6cb_processingstatus = "転記済み" && varEvidenceCase.cr6cb_excelcheckstatus = "全文一致", Coalesce(varEvidenceCase.cr6cb_reviewcomment, ""), "")
+            DisplayMode: =If(varDemoRole = "担当者役" && CountIf('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid) = 2 && varEvidenceCase.cr6cb_processingstatus = "転記済み" && varEvidenceCase.cr6cb_excelcheckstatus = "全文一致" && varEvidenceCase.cr6cb_reviewstatus <> "依頼中" && varEvidenceCase.cr6cb_reviewstatus <> "再依頼" && varEvidenceCase.cr6cb_reviewstatus <> "確認済み", DisplayMode.Edit, DisplayMode.Disabled)
+            Height: =72
+            OnChange: =Set(varCaseEditsPending, true)
+            Required: =radCaseJudgment.Selected.Value = "異常" || radCaseJudgment.Selected.Value = "判断保留"
+            Type: =TextInputType.Multiline
+            Width: =Parent.Width - 48
+            X: =24
+            Y: =If(Parent.Width >= 900, 578, 626)
+      - btnCaseRecord:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="確認を記録"
+            Appearance: ='ButtonCanvas.Appearance'.Primary
+            DisplayMode: =If(varDemoRole = "担当者役" && CountIf('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid) = 2 && varEvidenceCase.cr6cb_processingstatus = "転記済み" && varEvidenceCase.cr6cb_excelcheckstatus = "全文一致" && varEvidenceCase.cr6cb_reviewstatus <> "依頼中" && varEvidenceCase.cr6cb_reviewstatus <> "再依頼" && varEvidenceCase.cr6cb_reviewstatus <> "確認済み" && !IsBlank(radCaseCompare.Selected.Value) && !IsBlank(radCaseJudgment.Selected.Value) && (radCaseJudgment.Selected.Value = "正常" || !IsBlank(Trim(txtCaseComment.Text))), DisplayMode.Edit, DisplayMode.Disabled)
+            Height: =42
+            OnSelect: |-
+              =If(
+                varDemoRole = "担当者役" &&
+                CountIf('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid) = 2 &&
+                varEvidenceCase.cr6cb_processingstatus = "転記済み" &&
+                varEvidenceCase.cr6cb_excelcheckstatus = "全文一致" &&
+                varEvidenceCase.cr6cb_reviewstatus <> "依頼中" &&
+                varEvidenceCase.cr6cb_reviewstatus <> "再依頼" &&
+                varEvidenceCase.cr6cb_reviewstatus <> "確認済み" &&
+                !IsBlank(radCaseCompare.Selected.Value) &&
+                !IsBlank(radCaseJudgment.Selected.Value) &&
+                (radCaseJudgment.Selected.Value = "正常" || !IsBlank(Trim(txtCaseComment.Text))),
+                With(
+                  {
+                    savedCase: IfError(
+                      Patch(
+                        '架空ログ証跡件',
+                        varEvidenceCase,
+                        {
+                          cr6cb_transfercheck: radCaseCompare.Selected.Value,
+                          cr6cb_outcomejudgment: radCaseJudgment.Selected.Value,
+                          cr6cb_reviewcomment: txtCaseComment.Text
+                        }
+                      ),
+                      Blank()
+                    )
+                  },
+                  If(
+                    !IsBlank(savedCase.cr6cb_evidencecaseid),
+                    Set(varEvidenceCase, savedCase);
+                    Set(varCaseEditsPending, false);
+                    Set(varCaseReturnNeedsSave, false)
+                  )
+                )
+              )
+            Text: ="確認を記録"
+            Width: =150
+            X: =24
+            Y: =If(Parent.Width >= 900, 670, 686)
+      - btnCaseRequestReview:
+          Control: Button
+          Properties:
+            AccessibleLabel: =If(varEvidenceCase.cr6cb_reviewstatus = "差し戻し", "再依頼", "レビューを依頼")
+            Appearance: ='ButtonCanvas.Appearance'.Secondary
+            DisplayMode: =If(varDemoRole = "担当者役" && CountIf('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid) = 2 && varEvidenceCase.cr6cb_processingstatus = "転記済み" && varEvidenceCase.cr6cb_excelcheckstatus = "全文一致" && !IsBlank(varEvidenceCase.cr6cb_transfercheck) && !IsBlank(varEvidenceCase.cr6cb_outcomejudgment) && (varEvidenceCase.cr6cb_outcomejudgment = "正常" || !IsBlank(Trim(varEvidenceCase.cr6cb_reviewcomment))) && !varCaseEditsPending && !varCaseReturnNeedsSave && (IsBlank(varEvidenceCase.cr6cb_reviewstatus) || varEvidenceCase.cr6cb_reviewstatus = "未依頼" || varEvidenceCase.cr6cb_reviewstatus = "差し戻し"), DisplayMode.Edit, DisplayMode.Disabled)
+            Height: =42
+            OnSelect: |-
+              =If(
+                CountIf('件別ファイル', cr6cb_evidencecase.cr6cb_evidencecaseid = varEvidenceCase.cr6cb_evidencecaseid) = 2 &&
+                varEvidenceCase.cr6cb_processingstatus = "転記済み" &&
+                varEvidenceCase.cr6cb_excelcheckstatus = "全文一致" &&
+                !IsBlank(varEvidenceCase.cr6cb_transfercheck) &&
+                !IsBlank(varEvidenceCase.cr6cb_outcomejudgment) &&
+                (varEvidenceCase.cr6cb_outcomejudgment = "正常" || !IsBlank(Trim(varEvidenceCase.cr6cb_reviewcomment))) &&
+                !varCaseEditsPending &&
+                !varCaseReturnNeedsSave &&
+                (IsBlank(varEvidenceCase.cr6cb_reviewstatus) || varEvidenceCase.cr6cb_reviewstatus = "未依頼" || varEvidenceCase.cr6cb_reviewstatus = "差し戻し"),
+                With(
+                  {
+                    savedCase: IfError(
+                      Patch(
+                        '架空ログ証跡件',
+                        varEvidenceCase,
+                        {
+                          cr6cb_reviewstatus: If(varEvidenceCase.cr6cb_reviewstatus = "差し戻し", "再依頼", "依頼中")
+                        }
+                      ),
+                      Blank()
+                    )
+                  },
+                  If(
+                    !IsBlank(savedCase.cr6cb_evidencecaseid),
+                    Set(varEvidenceCase, savedCase);
+                    Navigate(Screen2, ScreenTransition.None)
+                  )
+                )
+              )
+            Text: =If(varEvidenceCase.cr6cb_reviewstatus = "差し戻し", "再依頼", "レビューを依頼")
+            Width: =160
+            X: =190
+            Y: =If(Parent.Width >= 900, 670, 686)
+      - btnCaseRetry:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="この件を再実行"
+            Appearance: ='ButtonCanvas.Appearance'.Secondary
+            DisplayMode: =DisplayMode.Disabled
+            Height: =42
+            Text: ="この件を再実行"
+            Visible: =false
+            Width: =170
+            X: =366
+            Y: =If(Parent.Width >= 900, 670, 686)
+      - btnCaseBack:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="一覧に戻る"
+            Appearance: ='ButtonCanvas.Appearance'.Secondary
+            Height: =42
+            OnSelect: =Navigate(Screen2, ScreenTransition.None)
+            Text: ="一覧に戻る"
+            Width: =150
+            X: =552
+            Y: =If(Parent.Width >= 900, 670, 686)

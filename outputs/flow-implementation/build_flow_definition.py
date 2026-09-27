@@ -11,7 +11,7 @@ import json
 import re
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 from urllib.parse import urlsplit, urlunsplit
 
 
@@ -35,6 +35,91 @@ T006_BROWSER_DOCUMENTS_ROOT = (
     "fujimasa_fujimasa13_onmicrosoft_com/Documents"
 )
 MAX_SINGLE_CELL_LENGTH = 30_000
+
+
+class MqChildAttachmentSchema(NamedTuple):
+    """Dataverse identifiers needed to read the role-specific child files.
+
+    Values live in a separate JSON config because the environment's actual
+    table and column logical names must be read from Dataverse before a
+    deployable candidate is generated.
+    """
+
+    entity_set: str
+    primary_id: str
+    parent_lookup_filter: str
+    role_column: str
+    file_name_column: str
+    log_role_value: str | int
+    excel_role_value: str | int
+
+    def is_resolved(self) -> bool:
+        values = (
+            self.entity_set,
+            self.primary_id,
+            self.parent_lookup_filter,
+            self.role_column,
+            self.file_name_column,
+            self.log_role_value,
+            self.excel_role_value,
+        )
+        return not any(
+            isinstance(value, str) and value.startswith("__SET_")
+            for value in values
+        )
+
+
+MQ_CHILD_ATTACHMENT_SCHEMA_PATH = HERE / "mq-child-attachment-schema.json"
+
+
+def load_mq_child_attachment_schema(
+    source_path: Path = MQ_CHILD_ATTACHMENT_SCHEMA_PATH,
+) -> MqChildAttachmentSchema:
+    """Load the non-secret Dataverse logical-name and role-value settings."""
+    source = source_path
+    if not source.is_absolute():
+        source = HERE.parent.parent / source
+    try:
+        value = json.loads(source.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot read MQ child attachment schema config: {source}") from exc
+    expected = {
+        "entity_set",
+        "primary_id",
+        "parent_lookup_filter",
+        "role_column",
+        "file_name_column",
+        "log_role_value",
+        "excel_role_value",
+    }
+    if not isinstance(value, dict) or set(value) != expected:
+        raise ValueError(
+            "MQ child attachment schema config must contain exactly: "
+            + ", ".join(sorted(expected))
+        )
+    for name in (
+        "entity_set",
+        "primary_id",
+        "parent_lookup_filter",
+        "role_column",
+        "file_name_column",
+    ):
+        if not isinstance(value[name], str) or not value[name].strip():
+            raise ValueError(f"MQ child attachment schema {name} must be a non-empty string")
+        pattern = r"_?[A-Za-z][A-Za-z0-9_]*"
+        is_placeholder = value[name].startswith("__SET_") and value[name].endswith("__")
+        if not is_placeholder and re.fullmatch(pattern, value[name]) is None:
+            raise ValueError(
+                f"MQ child attachment schema {name} must be a Dataverse identifier"
+            )
+    for name in ("log_role_value", "excel_role_value"):
+        if isinstance(value[name], bool) or not isinstance(value[name], (str, int)):
+            raise ValueError(f"MQ child attachment schema {name} must be a string or integer")
+        if isinstance(value[name], str) and not value[name].strip():
+            raise ValueError(f"MQ child attachment schema {name} must not be empty")
+    if value["log_role_value"] == value["excel_role_value"]:
+        raise ValueError("MQ log and Excel role values must be different")
+    return MqChildAttachmentSchema(**value)
 
 
 def _metadata_id(name: str) -> str:
@@ -1227,6 +1312,91 @@ def _mq_postcopy_unknown_item_expression() -> str:
     )
 
 
+def _mq_expression_literal(value: str | int) -> str:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return str(value)
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _mq_role_filter(schema: MqChildAttachmentSchema, value: str | int) -> dict[str, Any]:
+    return {
+        # This Query runs in the true branch of Condition_Two_Attachments,
+        # which itself runs only after List_MQ_File_Rows succeeds.
+        "runAfter": {},
+        "metadata": {"operationMetadataId": _metadata_id("Filter_MQ_Logs" if value == schema.log_role_value else "Filter_MQ_Books")},
+        "type": "Query",
+        "inputs": {
+            "from": "@body('List_MQ_File_Rows')?['value']",
+            "where": f"@equals(item()?['{schema.role_column}'],{_mq_expression_literal(value)})",
+        },
+    }
+
+
+def _mq_child_rows_action(schema: MqChildAttachmentSchema) -> dict[str, Any]:
+    return _list_rows(
+        "List_MQ_File_Rows",
+        schema.entity_set,
+        {
+            "$select": ",".join(
+                (schema.primary_id, schema.role_column, schema.file_name_column)
+            ),
+            "$filter": (
+                f"@concat('{schema.parent_lookup_filter} eq ',"
+                "outputs('Compose_CaseId'))"
+            ),
+            "$top": 3,
+        },
+        # The parent attachment count condition is the branch guard. Actions
+        # inside its else scope cannot use the parent's action in runAfter.
+        {},
+    )
+
+
+def _mq_child_notes_action(
+    *,
+    action_name: str,
+    role_filter_name: str,
+    schema: MqChildAttachmentSchema,
+    run_after: dict[str, list[str]],
+) -> dict[str, Any]:
+    child_id = f"first(body('{role_filter_name}'))?['{schema.primary_id}']"
+    return _list_rows(
+        action_name,
+        "annotations",
+        {
+            "$select": "annotationid,filename,documentbody,isdocument,_objectid_value",
+            "$filter": (
+                "@concat('isdocument eq true and _objectid_value eq ',"
+                f"coalesce({child_id},'00000000-0000-0000-0000-000000000000'))"
+            ),
+            "$top": 2,
+        },
+        run_after,
+    )
+
+
+def _mq_child_role_gate_expression(schema: MqChildAttachmentSchema) -> str:
+    log_note = "first(body('List_MQ_Log_Notes')?['value'])?"
+    book_note = "first(body('List_MQ_Book_Notes')?['value'])?"
+    log_row = f"first(body('Filter_MQ_Logs'))?['{schema.file_name_column}']"
+    book_row = f"first(body('Filter_MQ_Books'))?['{schema.file_name_column}']"
+    predicates = (
+        "equals(length(body('Filter_MQ_Logs')),1)",
+        "equals(length(body('Filter_MQ_Books')),1)",
+        "equals(length(body('List_MQ_Log_Notes')?['value']),1)",
+        "equals(length(body('List_MQ_Book_Notes')?['value']),1)",
+        f"not(empty({log_row}))",
+        f"not(empty({book_row}))",
+        f"equals({log_row},{log_note}['filename'])",
+        f"equals({book_row},{book_note}['filename'])",
+        f"endsWith(toLower(coalesce({log_note}['filename'],'')),'.txt')",
+        f"endsWith(toLower(coalesce({book_note}['filename'],'')),'.xlsx')",
+        f"not(empty({log_note}['documentbody']))",
+        f"not(empty({book_note}['documentbody']))",
+    )
+    return "@and(" + ",".join(predicates) + ")"
+
+
 def _mq_expected_readback_gate(expression: str) -> str:
     if not expression.startswith("@and(") or not expression.endswith(")"):
         raise ValueError("MQ candidate expected an AND-based Evidence readback expression")
@@ -1266,9 +1436,11 @@ def build_mq_candidate(
     clientdata: dict[str, Any] | None = None,
     *,
     script_ids: dict[str, str] | None = None,
+    attachment_schema: MqChildAttachmentSchema | None = None,
 ) -> dict[str, Any]:
-    """Return an offline MQ branch while leaving the one-note path intact."""
+    """Return an offline child-attachment MQ branch and preserve legacy intake."""
     selected_script_ids = _normalize_mq_script_ids(script_ids)
+    selected_attachment_schema = attachment_schema or load_mq_child_attachment_schema()
     candidate = copy.deepcopy(build_excelurl_candidate() if clientdata is None else clientdata)
     definition_actions = candidate["properties"]["definition"]["actions"]
     start_actions = definition_actions["Condition_Start_Ready"]["actions"]
@@ -1306,7 +1478,7 @@ def build_mq_candidate(
         {
             "folderPath": T006_FOLDER_PATH,
             "name": "@concat(outputs('Compose_CaseId'),'-MQ-Batch_Input.xlsx')",
-            "body": "@base64ToBinary(first(body('Filter_MQ_Books'))?['documentbody'])",
+            "body": "@base64ToBinary(first(body('List_MQ_Book_Notes')?['value'])?['documentbody'])",
         },
         {"Update_processing_MQ": ["Succeeded"]},
         retry_none=True,
@@ -1617,40 +1789,43 @@ def build_mq_candidate(
     postcopy_unknown["inputs"]["parameters"]["item"] = _mq_postcopy_unknown_item_expression()
     mq_destination["actions"] = destination_success_actions
 
-    # Preserve the original one-note route and add exactly one separate
-    # two-attachment path for MQ mode.
-    log_filter = {
-        "runAfter": {},
-        "metadata": {"operationMetadataId": _metadata_id("Filter_MQ_Logs")},
-        "type": "Query",
-        "inputs": {
-            "from": "@body('List_attached_notes')?['value']",
-            "where": "@endsWith(toLower(coalesce(item()?['filename'],'')),'.txt')",
-        },
-    }
-    book_filter = {
-        "runAfter": {},
-        "metadata": {"operationMetadataId": _metadata_id("Filter_MQ_Books")},
-        "type": "Query",
-        "inputs": {
-            "from": "@body('List_attached_notes')?['value']",
-            "where": "@endsWith(toLower(coalesce(item()?['filename'],'')),'.xlsx')",
-        },
-    }
+    # A newly created case stores one child row per role. The child rows point
+    # to their own Notes attachments; the parent Notes route stays only for
+    # the existing one-file legacy path above.
+    child_rows_action = _mq_child_rows_action(selected_attachment_schema)
+    log_filter = _mq_role_filter(
+        selected_attachment_schema, selected_attachment_schema.log_role_value
+    )
+    book_filter = _mq_role_filter(
+        selected_attachment_schema, selected_attachment_schema.excel_role_value
+    )
+    log_notes = _mq_child_notes_action(
+        action_name="List_MQ_Log_Notes",
+        role_filter_name="Filter_MQ_Logs",
+        schema=selected_attachment_schema,
+        run_after={"Filter_MQ_Logs": ["Succeeded"]},
+    )
+    book_notes = _mq_child_notes_action(
+        action_name="List_MQ_Book_Notes",
+        role_filter_name="Filter_MQ_Books",
+        schema=selected_attachment_schema,
+        run_after={"Filter_MQ_Books": ["Succeeded"]},
+    )
     role_gate = _condition(
         "Condition_MQ_Attachment_Roles",
-        {
-            "equals": [
-                "@and(equals(length(body('List_attached_notes')?['value']),2),equals(length(body('Filter_MQ_Logs')),1),equals(length(body('Filter_MQ_Books')),1))",
-                True,
-            ]
-        },
+        {"equals": [_mq_child_role_gate_expression(selected_attachment_schema), True]},
         {},
-        {"Filter_MQ_Logs": ["Succeeded"], "Filter_MQ_Books": ["Succeeded"]},
+        {
+            "List_MQ_Log_Notes": ["Succeeded"],
+            "List_MQ_Book_Notes": ["Succeeded"],
+        },
         {
             "Update_case_stop_mq_roles": _update_case(
                 "Update_case_stop_mq_roles",
-                _failure_item("停止", "MQ照合には.txtログと.xlsxブックが各1件必要です。欠落、重複、別形式の添付を確認してください。"),
+                _failure_item(
+                    "停止",
+                    "MQ照合には役割別の子ファイル2件と、各1件の対応添付が必要です。役割・ファイル名・拡張子・添付数を確認してください。",
+                ),
                 {},
             )
         },
@@ -1658,7 +1833,7 @@ def build_mq_candidate(
     role_gate["actions"] = {
         "Compose_LogText_MQ": _compose(
             "Compose_LogText_MQ",
-            "@base64ToString(first(body('Filter_MQ_Logs'))?['documentbody'])",
+            "@base64ToString(first(body('List_MQ_Log_Notes')?['value'])?['documentbody'])",
             {},
         ),
         "Update_case_stop_mq_log_unreadable": _update_case(
@@ -1668,7 +1843,7 @@ def build_mq_candidate(
         ),
         "Compose_LogFileName_MQ": _compose(
             "Compose_LogFileName_MQ",
-            "@first(body('Filter_MQ_Logs'))?['filename']",
+            "@first(body('List_MQ_Log_Notes')?['value'])?['filename']",
             {"Compose_LogText_MQ": ["Succeeded"]},
         ),
         "Compose_LogLines_MQ": _compose(
@@ -1720,22 +1895,63 @@ def build_mq_candidate(
     mq_destination["runAfter"] = {"Filter_active_destinations_MQ": ["Succeeded"]}
     two_attachment_condition = _condition(
         "Condition_Two_Attachments",
-        {"equals": ["@equals(length(body('List_attached_notes')?['value']),2)", True]},
+        {"equals": ["@equals(length(body('List_MQ_File_Rows')?['value']),2)", True]},
         {
             "Filter_MQ_Logs": log_filter,
             "Filter_MQ_Books": book_filter,
+            "Update_case_mq_log_role_filter_unknown": _update_case(
+                "Update_case_mq_log_role_filter_unknown",
+                _failure_item("結果不明", "ログ役割の子行を確認できません。状態を確認し、再実行しないでください。", "未確認"),
+                {"Filter_MQ_Logs": ["Failed", "TimedOut"]},
+            ),
+            "Update_case_mq_excel_role_filter_unknown": _update_case(
+                "Update_case_mq_excel_role_filter_unknown",
+                _failure_item("結果不明", "Excel役割の子行を確認できません。状態を確認し、再実行しないでください。", "未確認"),
+                {"Filter_MQ_Books": ["Failed", "TimedOut"]},
+            ),
+            "List_MQ_Log_Notes": log_notes,
+            "List_MQ_Book_Notes": book_notes,
+            "Update_case_mq_log_notes_unknown": _update_case(
+                "Update_case_mq_log_notes_unknown",
+                _failure_item("結果不明", "ログ添付を確認できません。状態を確認し、再実行しないでください。", "未確認"),
+                {"List_MQ_Log_Notes": ["Failed", "TimedOut"]},
+            ),
+            "Update_case_mq_book_notes_unknown": _update_case(
+                "Update_case_mq_book_notes_unknown",
+                _failure_item("結果不明", "Excel添付を確認できません。状態を確認し、再実行しないでください。", "未確認"),
+                {"List_MQ_Book_Notes": ["Failed", "TimedOut"]},
+            ),
             "Condition_MQ_Attachment_Roles": role_gate,
+            "Update_case_mq_roles_condition_unknown": _update_case(
+                "Update_case_mq_roles_condition_unknown",
+                "@addProperty(json('{}'),'cr6cb_processingstatus','結果不明')",
+                {"Condition_MQ_Attachment_Roles": ["Failed", "TimedOut"]},
+            ),
         },
         {},
         {
             "Update_case_stop_no_note": _update_case(
                 "Update_case_stop_no_note",
-                _failure_item("停止", "添付ファイルが1件（従来経路）または2件（MQ照合）ではありません。"),
+                _failure_item("停止", "MQ照合用の役割別ファイル2件が見つかりません。新規受付の内容を確認してください。"),
                 {},
             )
         },
     )
-    one_note["else"]["actions"] = {"Condition_Two_Attachments": two_attachment_condition}
+    one_note["else"]["actions"] = {
+        "List_MQ_File_Rows": child_rows_action,
+        "Condition_Two_Attachments": two_attachment_condition,
+        "Update_case_mq_child_rows_unknown": _update_case(
+            "Update_case_mq_child_rows_unknown",
+            _failure_item("結果不明", "役割別ファイルの情報を確認できません。状態を確認し、再実行しないでください。", "未確認"),
+            {"List_MQ_File_Rows": ["Failed", "TimedOut"]},
+        ),
+        "Update_case_mq_child_count_condition_unknown": _update_case(
+            "Update_case_mq_child_count_condition_unknown",
+            "@addProperty(json('{}'),'cr6cb_processingstatus','結果不明')",
+            {"Condition_Two_Attachments": ["Failed", "TimedOut"]},
+        ),
+    }
+    two_attachment_condition["runAfter"] = {"List_MQ_File_Rows": ["Succeeded"]}
     return candidate
 
 
@@ -1752,7 +1968,12 @@ def _mq_action_reference_errors(actions: dict[str, Any]) -> list[str]:
 
     mq_branch = {"Condition_Two_Attachments": two_attachment}
     local_actions = {name for name, _ in _all_actions(mq_branch)}
-    shared_ancestor_actions = {"Compose_CaseId", "Get_case", "List_attached_notes"}
+    shared_ancestor_actions = {
+        "Compose_CaseId",
+        "Get_case",
+        "List_attached_notes",
+        "List_MQ_File_Rows",
+    }
     references = set(re.findall(r"\b(?:outputs|body|actions)\('([^']+)'\)", json.dumps(mq_branch, ensure_ascii=False)))
     unresolved = sorted(references - local_actions - shared_ancestor_actions)
     if not unresolved:
@@ -1789,11 +2010,15 @@ def _mq_action_depth_errors(actions: dict[str, Any]) -> list[str]:
 
 
 def validate_mq_candidate(
-    clientdata: dict[str, Any], *, expected_script_ids: dict[str, str] | None = None
+    clientdata: dict[str, Any],
+    *,
+    expected_script_ids: dict[str, str] | None = None,
+    attachment_schema: MqChildAttachmentSchema | None = None,
 ) -> list[str]:
     """Check the MQ branch against explicit placeholders or selected live IDs."""
     errors: list[str] = []
     selected_script_ids = _normalize_mq_script_ids(expected_script_ids)
+    selected_attachment_schema = attachment_schema or load_mq_child_attachment_schema()
     sanitized = copy.deepcopy(clientdata)
     for _, action in _all_actions(sanitized["properties"]["definition"]["actions"]):
         inputs = action.get("inputs", {})
@@ -1813,19 +2038,116 @@ def validate_mq_candidate(
         errors.append("legacy one-attachment route must remain unchanged")
     if not isinstance(one_attachment, dict) or "Condition_Two_Attachments" not in one_attachment.get("else", {}).get("actions", {}):
         errors.append("two-attachment MQ mode must remain separate from the legacy route")
+    child_rows = _find_action(actions, "List_MQ_File_Rows")
+    child_rows_parameters = (
+        child_rows.get("inputs", {}).get("parameters", {})
+        if isinstance(child_rows, dict)
+        else {}
+    )
+    expected_child_select = ",".join(
+        (
+            selected_attachment_schema.primary_id,
+            selected_attachment_schema.role_column,
+            selected_attachment_schema.file_name_column,
+        )
+    )
+    if (
+        not isinstance(child_rows, dict)
+        or child_rows.get("inputs", {}).get("host", {}).get("operationId") != "ListRecords"
+        or child_rows_parameters.get("entityName") != selected_attachment_schema.entity_set
+        or child_rows_parameters.get("$select") != expected_child_select
+        or child_rows_parameters.get("$filter")
+        != (
+            f"@concat('{selected_attachment_schema.parent_lookup_filter} eq ',"
+            "outputs('Compose_CaseId'))"
+        )
+        or child_rows_parameters.get("$top") != 3
+        or child_rows.get("runAfter") != {}
+    ):
+        errors.append("MQ child rows must be listed by parent case GUID with a bounded result and configured schema")
+    two_attachment = _find_action(actions, "Condition_Two_Attachments")
+    if (
+        not isinstance(two_attachment, dict)
+        or two_attachment.get("expression")
+        != {
+            "equals": ["@equals(length(body('List_MQ_File_Rows')?['value']),2)", True]
+        }
+        or two_attachment.get("runAfter") != {"List_MQ_File_Rows": ["Succeeded"]}
+    ):
+        errors.append("MQ child rows must contain exactly two records before role processing")
+    for action_name, role_value in (
+        ("Filter_MQ_Logs", selected_attachment_schema.log_role_value),
+        ("Filter_MQ_Books", selected_attachment_schema.excel_role_value),
+    ):
+        role_filter = _find_action(actions, action_name)
+        expected_where = (
+            f"@equals(item()?['{selected_attachment_schema.role_column}'],"
+            f"{_mq_expression_literal(role_value)})"
+        )
+        if (
+            not isinstance(role_filter, dict)
+            or role_filter.get("type") != "Query"
+            or role_filter.get("inputs", {}).get("from")
+            != "@body('List_MQ_File_Rows')?['value']"
+            or role_filter.get("inputs", {}).get("where") != expected_where
+            or role_filter.get("runAfter") != {}
+        ):
+            errors.append(f"{action_name} must select child rows using its configured role value")
+    for action_name, role_filter_name in (
+        ("List_MQ_Log_Notes", "Filter_MQ_Logs"),
+        ("List_MQ_Book_Notes", "Filter_MQ_Books"),
+    ):
+        notes = _find_action(actions, action_name)
+        expected_notes = _mq_child_notes_action(
+            action_name=action_name,
+            role_filter_name=role_filter_name,
+            schema=selected_attachment_schema,
+            run_after={role_filter_name: ["Succeeded"]},
+        )
+        if (
+            not isinstance(notes, dict)
+            or notes.get("inputs", {}).get("parameters")
+            != expected_notes.get("inputs", {}).get("parameters")
+            or notes.get("inputs", {}).get("host", {}).get("operationId") != "ListRecords"
+            or notes.get("runAfter") != {role_filter_name: ["Succeeded"]}
+        ):
+            errors.append(f"{action_name} must retrieve Notes by the corresponding child row GUID")
     role_gate = _find_action(actions, "Condition_MQ_Attachment_Roles")
-    if not isinstance(role_gate, dict) or role_gate.get("expression") != {
-        "equals": [
-            "@and(equals(length(body('List_attached_notes')?['value']),2),equals(length(body('Filter_MQ_Logs')),1),equals(length(body('Filter_MQ_Books')),1))",
-            True,
-        ]
-    }:
-        errors.append("MQ attachment roles must require exactly one .txt and one .xlsx from two notes")
-    for name, extension in (("Filter_MQ_Logs", ".txt"), ("Filter_MQ_Books", ".xlsx")):
-        action = _find_action(actions, name)
-        where = action.get("inputs", {}).get("where", "") if isinstance(action, dict) else ""
-        if action is None or f"'{extension}'" not in where or "toLower" not in where:
-            errors.append(f"MQ role filter must identify {extension} case-insensitively")
+    if (
+        not isinstance(role_gate, dict)
+        or role_gate.get("expression")
+        != {
+            "equals": ["@" + _mq_child_role_gate_expression(selected_attachment_schema)[1:], True]
+        }
+        or role_gate.get("runAfter")
+        != {
+            "List_MQ_Log_Notes": ["Succeeded"],
+            "List_MQ_Book_Notes": ["Succeeded"],
+        }
+    ):
+        errors.append("MQ attachment roles gate must require one child and one matching Notes attachment per role, with matching names, extensions, and content")
+    else:
+        gate_else_actions = role_gate.get("else", {}).get("actions", {})
+        false_path = json.dumps(gate_else_actions, ensure_ascii=False)
+        if any(
+            action_name in false_path
+            for action_name in ("Stage_MQ_Input", "Copy_template_MQ", "Run_MQ_Result_Write_MQ")
+        ):
+            errors.append("MQ must not stage input or create a result workbook when child roles or attachments are invalid")
+        required_failure_paths = (
+            ("Update_case_stop_no_note", two_attachment.get("else", {}).get("actions", {}), {}),
+            ("Update_case_stop_mq_roles", gate_else_actions, {}),
+            ("Update_case_mq_child_rows_unknown", one_attachment.get("else", {}).get("actions", {}), {"List_MQ_File_Rows": ["Failed", "TimedOut"]}),
+            ("Update_case_mq_log_role_filter_unknown", two_attachment.get("actions", {}), {"Filter_MQ_Logs": ["Failed", "TimedOut"]}),
+            ("Update_case_mq_excel_role_filter_unknown", two_attachment.get("actions", {}), {"Filter_MQ_Books": ["Failed", "TimedOut"]}),
+            ("Update_case_mq_log_notes_unknown", two_attachment.get("actions", {}), {"List_MQ_Log_Notes": ["Failed", "TimedOut"]}),
+            ("Update_case_mq_book_notes_unknown", two_attachment.get("actions", {}), {"List_MQ_Book_Notes": ["Failed", "TimedOut"]}),
+            ("Update_case_mq_roles_condition_unknown", two_attachment.get("actions", {}), {"Condition_MQ_Attachment_Roles": ["Failed", "TimedOut"]}),
+        )
+        for action_name, scope_actions, expected_run_after in required_failure_paths:
+            failure_action = scope_actions.get(action_name) if isinstance(scope_actions, dict) else None
+            if not isinstance(failure_action, dict) or failure_action.get("runAfter") != expected_run_after:
+                errors.append(f"MQ child attachment failure path is missing or miswired: {action_name}")
     stage = _find_action(actions, "Stage_MQ_Input")
     if (
         not isinstance(stage, dict)
@@ -1833,8 +2155,17 @@ def validate_mq_candidate(
         or stage.get("inputs", {}).get("retryPolicy") != {"type": "none"}
         or stage.get("inputs", {}).get("parameters", {}).get("folderPath") != T006_FOLDER_PATH
         or "outputs('Compose_CaseId')" not in stage.get("inputs", {}).get("parameters", {}).get("name", "")
+        or stage.get("inputs", {}).get("parameters", {}).get("body")
+        != "@base64ToBinary(first(body('List_MQ_Book_Notes')?['value'])?['documentbody'])"
     ):
-        errors.append("MQ input must be copied to the T006 OneDrive folder under a caseId-based name without automatic retry")
+        errors.append("MQ input must stage the child Excel attachment in the T006 OneDrive folder under a caseId-based name without automatic retry")
+    log_text = _find_action(actions, "Compose_LogText_MQ")
+    if (
+        not isinstance(log_text, dict)
+        or log_text.get("inputs")
+        != "@base64ToString(first(body('List_MQ_Log_Notes')?['value'])?['documentbody'])"
+    ):
+        errors.append("MQ log parsing must use the Notes attachment associated with the log child row")
     reader = _find_action(actions, "Run_MQ_Input_Validation")
     if (
         not isinstance(reader, dict)
@@ -2049,8 +2380,20 @@ def write_mq_candidate(script_id_source: Path) -> Path:
     if not source.is_absolute():
         source = HERE.parent.parent / source
     selected_script_ids = load_mq_script_ids(source)
-    candidate = build_mq_candidate(script_ids=selected_script_ids)
-    errors = validate_mq_candidate(candidate, expected_script_ids=selected_script_ids)
+    selected_attachment_schema = load_mq_child_attachment_schema()
+    if not selected_attachment_schema.is_resolved():
+        raise ValueError(
+            "MQ child attachment schema still contains placeholders; resolve it before writing a local candidate"
+        )
+    candidate = build_mq_candidate(
+        script_ids=selected_script_ids,
+        attachment_schema=selected_attachment_schema,
+    )
+    errors = validate_mq_candidate(
+        candidate,
+        expected_script_ids=selected_script_ids,
+        attachment_schema=selected_attachment_schema,
+    )
     if errors:
         raise ValueError("MQ local candidate failed static validation: " + "; ".join(errors))
     output = HERE / "flow-definition.mq-local-candidate.json"
