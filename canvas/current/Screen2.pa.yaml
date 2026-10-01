@@ -1,0 +1,295 @@
+Screens:
+  Screen2:
+    Properties:
+      Fill: =RGBA(243, 246, 250, 1)
+      LoadingSpinnerColor: =RGBA(0, 96, 160, 1)
+      OnVisible: =Set(varS02Now, Now()); Set(varS02ShowArchived, false); Set(varS02ArchiveChoice, '保管済み (架空ログ証跡件)'.通常); Refresh('架空ログ証跡件'); Refresh('件別ファイル')
+    Children:
+      - lblS02Title:
+          Control: Label
+          Properties:
+            Color: =RGBA(25, 54, 92, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Bold
+            Height: =52
+            Size: =If(Parent.Width < 360, 22, 28)
+            Text: ="進捗一覧"
+            Width: =Min(Parent.Width - 48, 1200)
+            X: =(Parent.Width - Self.Width) / 2
+            Y: =18
+      - btnS02NewIntake:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="照合するファイルを選ぶ"
+            Appearance: ='ButtonCanvas.Appearance'.Secondary
+            Height: =42
+            OnSelect: |-
+              =Set(varS01NewIntakeRequested, true);
+              Navigate(Screen1, ScreenTransition.None)
+            Text: ="照合するファイルを選ぶ"
+            Width: =If(Parent.Width < 640, Parent.Width - 48, 240)
+            X: =If(Parent.Width < 640, 24, (Parent.Width - Min(Parent.Width - 48, 1200)) / 2)
+            Y: =82
+      - btnS02ArchiveToggle:
+          Control: Button
+          Properties:
+            AccessibleLabel: =If(varS02ShowArchived, "進捗一覧に戻る", "完了した履歴を見る")
+            Appearance: ='ButtonCanvas.Appearance'.Secondary
+            Height: =42
+            OnSelect: =Set(varS02ShowArchived, !varS02ShowArchived); Set(varS02ArchiveChoice, If(varS02ShowArchived, '保管済み (架空ログ証跡件)'.保管済み, '保管済み (架空ログ証跡件)'.通常))
+            Text: =If(varS02ShowArchived, "進捗一覧に戻る", "完了した履歴を見る")
+            Width: =If(Parent.Width < 640, Parent.Width - 48, 180)
+            X: =If(Parent.Width < 640, 24, btnS02NewIntake.X + btnS02NewIntake.Width + 12)
+            Y: =If(Parent.Width < 640, 130, 82)
+      - tmrS02Refresh:
+          Control: Timer
+          Properties:
+            AutoStart: =true
+            Duration: =1000
+            OnTimerEnd: =Set(varS02Now, Now())
+            Repeat: =true
+            Visible: =false
+      - tmrS02DataRefresh:
+          Control: Timer
+          Properties:
+            AutoStart: =true
+            Duration: =10000
+            OnTimerEnd: =Refresh('架空ログ証跡件')
+            Repeat: =true
+            Visible: =false
+      - galS02Cases:
+          Control: Gallery
+          Variant: Vertical
+          Properties:
+            AccessibleLabel: ="処理状況の一覧"
+            Height: =If(Parent.Width < 640, Parent.Height - 200, Parent.Height - 152)
+            Items: =If(varS02ShowArchived, SortByColumns(Filter('架空ログ証跡件', 保管済み = '保管済み (架空ログ証跡件)'.保管済み), "modifiedon", SortOrder.Descending), SortByColumns(Filter('架空ログ証跡件', 保管済み <> '保管済み (架空ログ証跡件)'.保管済み), "modifiedon", SortOrder.Descending))
+            TemplateSize: =If(Parent.Width >= 900, 292, 540)
+            Width: =Min(Parent.Width - 48, 1200)
+            X: =(Parent.Width - Self.Width) / 2
+            Y: =If(Parent.Width < 640, 180, 138)
+          Children:
+            - lblS02Status:
+                Control: Label
+                Properties:
+                  Color: =If(!IsBlank(ThisItem.停止理由) || ThisItem.処理状態 = "停止" || ThisItem.処理状態 = "結果不明" || (ThisItem.処理状態 = "転記済み" && (ThisItem.Excel反映確認 <> "全文一致" || (!IsBlank(ThisItem.バッチExcelファイル名) && ThisItem.MQ比較状態 <> "比較完了"))), RGBA(163, 38, 45, 1), ThisItem.処理状態 = "転記済み" && ThisItem.Excel反映確認 = "全文一致", RGBA(16, 112, 63, 1), ThisItem.処理状態 = "開始受付済み" || ThisItem.処理状態 = "処理中", RGBA(138, 89, 0, 1), RGBA(85, 93, 104, 1))
+                  Font: =Font.'Segoe UI'
+                  FontWeight: =FontWeight.Semibold
+                  Height: =32
+                  Size: =18
+                  Text: ="● " & If(!IsBlank(ThisItem.停止理由) || ThisItem.処理状態 = "停止" || ThisItem.処理状態 = "結果不明" || (ThisItem.処理状態 = "転記済み" && ThisItem.Excel反映確認 <> "全文一致"), "要対応", ThisItem.処理状態 = "転記済み" && !IsBlank(ThisItem.バッチExcelファイル名) && ThisItem.MQ比較状態 <> "比較完了", If(ThisItem.MQ比較状態 = "要確認" && ThisItem.MQ終端状態 = "あり", "差異あり", "要対応"), ThisItem.処理状態 = "転記済み" && ThisItem.Excel反映確認 = "全文一致", "照合完了", ThisItem.処理状態 = "開始受付済み" || ThisItem.処理状態 = "処理中", "照合中", "開始前")
+                  Width: =Parent.TemplateWidth - 48
+                  X: =24
+                  Y: =14
+            - lblS02Identity:
+                Control: Label
+                Properties:
+                  Color: =RGBA(25, 54, 92, 1)
+                  Font: =Font.'Segoe UI'
+                  FontWeight: =FontWeight.Semibold
+                  Height: =If(Parent.TemplateWidth < 600, 100, 80)
+                  Text: |-
+                    ="サーバーログ: " & Coalesce(ThisItem.件の表示名, "—") &
+                    If(!IsBlank(ThisItem.バッチExcelファイル名), Char(10) & "更新対象一覧: " & ThisItem.バッチExcelファイル名, "") &
+                    Char(10) & "環境: " & Substitute(Coalesce(ThisItem.環境, "—"), "架空", "") & " / サーバー: " & Substitute(Coalesce(ThisItem.サーバー, "—"), "架空", "")
+                  Width: =If(Parent.TemplateWidth >= 900, Parent.TemplateWidth * 0.57 - 40, Parent.TemplateWidth - 48)
+                  X: =24
+                  Y: =54
+            - lblS02CaseMeta:
+                Control: Label
+                Properties:
+                  Color: =RGBA(42, 57, 75, 1)
+                  Font: =Font.'Segoe UI'
+                  Height: =32
+                  Size: =12
+                  Text: |-
+                    ="受付日時: " & If(
+                      IsBlank(ThisItem.作成日),
+                      "—",
+                      Text(
+                        DateAdd(
+                          DateAdd(ThisItem.作成日, TimeZoneOffset(ThisItem.作成日), TimeUnit.Minutes),
+                          9,
+                          TimeUnit.Hours
+                        ),
+                        "[$-ja-JP]yyyy-mm-dd hh:mm:ss"
+                      ) & " JST"
+                    )
+                  Width: =If(Parent.TemplateWidth >= 900, Parent.TemplateWidth * 0.57 - 40, Parent.TemplateWidth - 48)
+                  X: =24
+                  Y: =lblS02Identity.Y + lblS02Identity.Height + 4
+            - lblS02Processing:
+                Control: Label
+                Properties:
+                  Color: =RGBA(42, 57, 75, 1)
+                  Font: =Font.'Segoe UI'
+                  Height: =88
+                  Text: |-
+                    ="ファイル: " & If(
+                      !IsBlank(ThisItem.架空ログ証跡件),
+                      Switch(ThisItem.処理状態, "保存済み", "保存済み", "取消", "保存済み", "開始受付済み", "保存済み", "処理中", "保存済み", "停止", "保存済み", "結果不明", "保存済み", "転記済み", "保存済み", "要確認"),
+                      "要確認"
+                    ) &
+                    Char(10) & "照合: " & Switch(ThisItem.処理状態, "保存済み", "未開始", "取消", "未開始", "開始受付済み", "進行中", "処理中", "進行中", "停止", "停止", "結果不明", "結果を確認できません", "転記済み", If(ThisItem.Excel反映確認 = "全文一致", "完了", "結果を確認できません"), "未開始") &
+                    If(
+                      ThisItem.処理状態 = "開始受付済み" || ThisItem.処理状態 = "処理中",
+                      Char(10) & "照合開始から: " & If(
+                        IsBlank(ThisItem.開始操作日時),
+                        "時刻を確認中",
+                        With(
+                          {elapsed: Max(0, DateDiff(ThisItem.開始操作日時, varS02Now, TimeUnit.Seconds))},
+                          Text(RoundDown(elapsed / 3600, 0), "00") & ":" & Text(Mod(RoundDown(elapsed / 60, 0), 60), "00") & ":" & Text(Mod(elapsed, 60), "00")
+                        )
+                      ),
+                      ""
+                    )
+                  Width: =If(Parent.TemplateWidth >= 900, Parent.TemplateWidth * 0.43 - 48, Parent.TemplateWidth - 48)
+                  X: =If(Parent.TemplateWidth >= 900, Parent.TemplateWidth * 0.57, 24)
+                  Y: =If(Parent.TemplateWidth >= 900, 54, lblS02MqSummary.Y + lblS02MqSummary.Height + 8)
+            - lblS02HumanChecks:
+                Control: Label
+                Properties:
+                  Color: =RGBA(42, 57, 75, 1)
+                  Font: =Font.'Segoe UI'
+                  Height: =84
+                  Text: |-
+                    =With(
+                      {canShowHumanDecision: ThisItem.処理状態 = "転記済み" && ThisItem.Excel反映確認 = "全文一致"},
+                      "担当者の確認: " & If(canShowHumanDecision, Coalesce(ThisItem.転記照合, "未記録"), "照合後に確認") &
+                      Char(10) & "処理結果の判断: " & If(canShowHumanDecision, Coalesce(ThisItem.処理結果判断, "未記録"), "照合後に確認") &
+                      Char(10) & "レビュー: " & If(IsBlank(ThisItem.レビュー状態) || ThisItem.レビュー状態 = "未依頼", "依頼前", ThisItem.レビュー状態)
+                    )
+                  Width: =If(Parent.TemplateWidth >= 900, Parent.TemplateWidth * 0.43 - 48, Parent.TemplateWidth - 48)
+                  X: =If(Parent.TemplateWidth >= 900, Parent.TemplateWidth * 0.57, 24)
+                  Y: =lblS02Processing.Y + lblS02Processing.Height + 8
+            - lblS02MqSummary:
+                Control: Label
+                Properties:
+                  Color: =RGBA(42, 57, 75, 1)
+                  Font: =Font.'Segoe UI'
+                  Height: =48
+                  Text: |-
+                    =If(
+                      IsBlank(ThisItem.バッチExcelファイル名),
+                      "照合結果: 照合前",
+                      If(
+                        ThisItem.処理状態 = "保存済み" || ThisItem.処理状態 = "取消",
+                        "照合結果: 照合前",
+                        ThisItem.処理状態 = "開始受付済み" || ThisItem.処理状態 = "処理中",
+                        "照合結果: 照合中",
+                        ThisItem.処理状態 = "停止" || ThisItem.処理状態 = "結果不明",
+                        "照合できません: " & Coalesce(ThisItem.停止理由, "処理状態を確認してください"),
+                        If(
+                        (CountIf('件別ファイル', 対象件.架空ログ証跡件 = ThisItem.架空ログ証跡件 && ファイル種別 = "log") = 1 &&
+                        CountIf('件別ファイル', 対象件.架空ログ証跡件 = ThisItem.架空ログ証跡件 && ファイル種別 = "excel") = 1) ||
+                        (CountRows(Filter('件別ファイル', 対象件.架空ログ証跡件 = ThisItem.架空ログ証跡件)) = 0 && CountIf(ThisItem.Attachments, EndsWith(Lower(DisplayName), ".xlsx")) = 1),
+                        If(
+                          ThisItem.処理状態 = "転記済み" && ThisItem.Excel反映確認 = "全文一致" && ThisItem.MQ終端状態 = "あり",
+                          With(
+                            {differenceCount: CountRows(Filter(Split(Coalesce(ThisItem.MQ結果テキスト, ""), Char(10)), "ログ未記録" in Value || "ログに記録なし" in Value || "予定外ID" in Value || "一覧にない" in Value))},
+                            "照合結果: " & If(
+                              ThisItem.MQ比較状態 = "比較完了" && differenceCount = 0,
+                              "差異なし（0件）",
+                              ThisItem.MQ比較状態 = "要確認" && differenceCount > 0,
+                              "差異あり（" & Text(differenceCount, "0") & "件）",
+                              "結果を確認中"
+                            )
+                          ),
+                          If(ThisItem.MQ終端状態 = "なし", "照合できません: ログの終了を確認できません", "照合結果: 結果を確認中")
+                        ),
+                        "照合できません: 添付ファイルを確認できません"
+                        )
+                      )
+                    )
+                  Width: =If(Parent.TemplateWidth >= 900, Parent.TemplateWidth * 0.57 - 40, Parent.TemplateWidth - 48)
+                  X: =24
+                  Y: =lblS02CaseMeta.Y + lblS02CaseMeta.Height + 8
+            - lblS02Failure:
+                Control: Label
+                Properties:
+                  AutoHeight: =true
+                  Color: =RGBA(163, 38, 45, 1)
+                  Font: =Font.'Segoe UI'
+                  Height: =28
+                  Text: =ThisItem.停止理由
+                  Visible: =!IsBlank(ThisItem.停止理由)
+                  Width: =If(Parent.TemplateWidth >= 900, Parent.TemplateWidth * 0.57 - 40, Parent.TemplateWidth - 48)
+                  X: =24
+                  Y: =If(Parent.TemplateWidth >= 900, lblS02MqSummary.Y + lblS02MqSummary.Height + 8, lblS02HumanChecks.Y + lblS02HumanChecks.Height + 8)
+            - btnS02OpenCase:
+                Control: Button
+                Properties:
+                  AccessibleLabel: ="ログと結果を見る"
+                  Appearance: ='ButtonCanvas.Appearance'.Primary
+                  Height: =42
+                  OnSelect: =Set(varEvidenceCase, ThisItem); Navigate(Screen3, ScreenTransition.None)
+                  Text: ="ログと結果を見る"
+                  Width: =If(Parent.Width >= 900, 176, 160)
+                  X: =If(Parent.TemplateWidth >= 900, Parent.TemplateWidth * 0.57, 24)
+                  Y: =If(Parent.TemplateWidth >= 900, 238, If(!IsBlank(ThisItem.停止理由), lblS02Failure.Y + lblS02Failure.Height + 8, lblS02HumanChecks.Y + lblS02HumanChecks.Height + 8))
+            - btnS02OpenReview:
+                Control: Button
+                Properties:
+                  AccessibleLabel: ="レビューを確認"
+                  Appearance: ='ButtonCanvas.Appearance'.Secondary
+                  DisplayMode: =If(ThisItem.処理状態 = "転記済み" && ThisItem.Excel反映確認 = "全文一致" && (ThisItem.レビュー状態 = "依頼中" || ThisItem.レビュー状態 = "再依頼" || ThisItem.レビュー状態 = "差し戻し" || ThisItem.レビュー状態 = "確認済み"), DisplayMode.Edit, DisplayMode.Disabled)
+                  Height: =42
+                  OnSelect: =If(ThisItem.処理状態 = "転記済み" && ThisItem.Excel反映確認 = "全文一致" && (ThisItem.レビュー状態 = "依頼中" || ThisItem.レビュー状態 = "再依頼" || ThisItem.レビュー状態 = "差し戻し" || ThisItem.レビュー状態 = "確認済み"), Set(varEvidenceCase, ThisItem); Set(varDemoRole, "担当者役"); Navigate(Screen4, ScreenTransition.None))
+                  Text: ="レビューを確認"
+                  Width: =If(Parent.Width >= 900, 170, 138)
+                  X: =If(Parent.TemplateWidth >= 900, btnS02OpenCase.X + btnS02OpenCase.Width + 12, btnS02OpenCase.X + btnS02OpenCase.Width + 12)
+                  Y: =btnS02OpenCase.Y
+            - btnS02Archive:
+                Control: Button
+                Properties:
+                  AccessibleLabel: =If(ThisItem.保管済み = '保管済み (架空ログ証跡件)'.保管済み, "進捗一覧へ戻す", "完了履歴に移す")
+                  Appearance: ='ButtonCanvas.Appearance'.Secondary
+                  Height: =42
+                  OnSelect: |-
+                    =If(
+                      ThisItem.レビュー状態 = "確認済み",
+                      With(
+                        {savedCase: IfError(Patch('架空ログ証跡件', ThisItem, {保管済み: If(ThisItem.保管済み = '保管済み (架空ログ証跡件)'.保管済み, '保管済み (架空ログ証跡件)'.通常, '保管済み (架空ログ証跡件)'.保管済み)}), Blank())},
+                        If(
+                          !IsBlank(savedCase.架空ログ証跡件),
+                          Refresh('架空ログ証跡件');
+                          Set(varS02ArchiveSavedId, savedCase.架空ログ証跡件);
+                          With(
+                            {confirmedCase: LookUp('架空ログ証跡件', 架空ログ証跡件 = varS02ArchiveSavedId)},
+                            If(confirmedCase.保管済み = savedCase.保管済み, Notify("表示を切り替えました。", NotificationType.Success), Notify("保管状態を確認できません。", NotificationType.Error))
+                          ),
+                          Notify("保管状態を保存できませんでした。", NotificationType.Error)
+                        )
+                      )
+                    )
+                  Text: =If(ThisItem.保管済み = '保管済み (架空ログ証跡件)'.保管済み, "進捗一覧へ戻す", "完了履歴に移す")
+                  Visible: =ThisItem.レビュー状態 = "確認済み"
+                  Width: =160
+                  X: =If(Parent.TemplateWidth >= 900, 24, 24)
+                  Y: =If(Parent.TemplateWidth >= 900, 238, btnS02OpenCase.Y + btnS02OpenCase.Height + 8)
+            - btnS02BackIntake:
+                Control: Button
+                Properties:
+                  AccessibleLabel: ="受付へ戻る"
+                  Appearance: ='ButtonCanvas.Appearance'.Secondary
+                  DisplayMode: =If(ThisItem.処理状態 = "保存済み" && !IsBlank(ThisItem.停止理由), DisplayMode.Edit, DisplayMode.Disabled)
+                  Height: =42
+                  OnSelect: =Set(varS01NewIntakeRequested, true); Navigate(Screen1, ScreenTransition.None)
+                  Text: ="受付へ戻る"
+                  Visible: =false
+                  Width: =If(Parent.Width >= 900, 150, 160)
+                  X: =If(Parent.Width >= 900, 390, 16)
+                  Y: =If(Parent.Width >= 900, 258, 306)
+            - btnS02ResumeSavedCase:
+                Control: Button
+                Properties:
+                  AccessibleLabel: ="処理開始へ戻る"
+                  Appearance: ='ButtonCanvas.Appearance'.Secondary
+                  DisplayMode: =If(ThisItem.処理状態 = "保存済み" && IsBlank(ThisItem.停止理由), DisplayMode.Edit, DisplayMode.Disabled)
+                  Height: =42
+                  OnSelect: =Set(varT001Saved, ThisItem); Navigate(Screen1, ScreenTransition.None)
+                  Text: ="処理開始へ戻る"
+                  Visible: =false
+                  Width: =If(Parent.Width >= 900, 180, 170)
+                  X: =If(Parent.Width >= 900, 556, 16)
+                  Y: =If(Parent.Width >= 900, 258, 306)

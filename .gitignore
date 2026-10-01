@@ -102,3 +102,33 @@ outputs/canvas-mq-one-action-saved-readback-20260928/
 
 # Generated flow comparison paths; source builder and explanatory notes are tracked
 outputs/mq-two-files-20260928/diff-paths.txt
+
+# Local Canvas authoring snapshots. Maintained saved definitions: canvas/current/
+# Already tracked historical snapshots remain in Git; new duplicates stay local.
+outputs/canvas-*/
+
+# Live cloud definitions, tenant records, deletion inventories and recovery copies
+outputs/sharepoint-teams-flow-definitions-*/
+outputs/flow-implementation/sharepoint-teams-preflight-live-flow.json
+outputs/ui-cleanup-*/
+outputs/cleanup-execution-*/
+outputs/review-ux-*/
+outputs/mq-group1-*/
+outputs/date-independent-20261001/*
+!outputs/date-independent-20261001/test_date_independent.py
+
+# Generated script wrappers and superseded local input builders/previews
+outputs/mq-20260930-ui-compare/
+outputs/mq-final-clarity-*/
+outputs/mq-readability-*/
+outputs/mq-user-test-*/
+outputs/mq-fresh-test-*/
+outputs/mq-acceptance-previews/
+outputs/fix_screen1_indent.py
+outputs/rewrite_screen1_repeat.py
+
+# Spreadsheet inspection sidecars are generated, not input workbooks
+*.inspect.ndjson
+
+# One-off local Git inventory, checks, and command output
+outputs/git-delivery-*/

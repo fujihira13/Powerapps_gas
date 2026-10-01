@@ -248,7 +248,7 @@ def _excel_item_expression() -> str:
         ),
         (
             "TargetDate",
-            "formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd')",
+            "if(empty(outputs('Get_case')?['body/cr6cb_targetdate']),'',formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd'))",
         ),
         ("ChunkIndex", "1"),
         ("ChunkCount", "1"),
@@ -266,18 +266,19 @@ def _log_validation_reason_expression(*, include_run_number: bool = False) -> st
     """Return a specific pre-copy rejection reason, or an empty string if valid."""
     lines = "outputs('Compose_LogLines')"
     line0 = f"string(coalesce({lines}?[0],''))"
-    line1 = f"string(coalesce({lines}?[1],''))"
-    line2 = f"string(coalesce({lines}?[2],''))"
+    # A legacy processing-date header is informational only. No date is required
+    # or compared: the same inputs can be checked on any later day.
+    has_legacy_date = f"startsWith({line0},'処理日: ')"
+    line1 = f"if({has_legacy_date},string(coalesce({lines}?[1],'')),{line0})"
+    line2 = f"if({has_legacy_date},string(coalesce({lines}?[2],'')),string(coalesce({lines}?[1],'')))"
     server = "outputs('Get_case')?['body/cr6cb_server']"
     environment = "outputs('Get_case')?['body/cr6cb_environment']"
-    target_date = "outputs('Get_case')?['body/cr6cb_targetdate']"
     server_expected = f"concat('サーバー: ',{server})"
     environment_expected = f"concat('環境: ',{environment})"
-    date_expected = f"concat('処理日: ',formatDateTime({target_date},'yyyy-MM-dd'))"
 
     reason = "''"
     if include_run_number:
-        line3 = f"string(coalesce({lines}?[3],''))"
+        line3 = f"if({has_legacy_date},string(coalesce({lines}?[3],'')),string(coalesce({lines}?[2],'')))"
         run_number = "outputs('Get_case')?['body/cr6cb_runnumber']"
         run_expected = f"concat('実行回: ',string({run_number}))"
         reason = (
@@ -311,63 +312,6 @@ def _log_validation_reason_expression(*, include_run_number: bool = False) -> st
         f"{reason})"
     )
     reason = (
-        f"if(not(equals({line0},{date_expected})),"
-        f"concat('本文日付（',substring({line0},5,10),'）と対象処理日（',"
-        f"formatDateTime({target_date},'yyyy-MM-dd'),'）が一致しません。'),"
-        f"{reason})"
-    )
-    date_digits = (5, 6, 7, 8, 10, 11, 13, 14)
-    invalid_date_digit = "or(" + ",".join(
-        f"not(contains('0123456789',substring({line0},{position},1)))"
-        for position in date_digits
-    ) + ")"
-    year = f"int(substring({line0},5,4))"
-    month = f"int(substring({line0},10,2))"
-    day = f"int(substring({line0},13,2))"
-    leap_year = (
-        f"or(equals(mod({year},400),0),"
-        f"and(equals(mod({year},4),0),not(equals(mod({year},100),0))))"
-    )
-    days_in_month = (
-        f"if(or({','.join(f'equals({month},{value})' for value in (1, 3, 5, 7, 8, 10, 12))}),31,"
-        f"if(equals({month},2),if({leap_year},29,28),30))"
-    )
-    valid_calendar_date = (
-        f"and(greaterOrEquals({year},1),lessOrEquals({year},9999),"
-        f"greaterOrEquals({month},1),lessOrEquals({month},12),"
-        f"greaterOrEquals({day},1),lessOrEquals({day},{days_in_month}))"
-    )
-    reason = (
-        f"if(not({valid_calendar_date}),"
-        "'ログの処理日は暦上存在しない日付です。',"
-        f"{reason})"
-    )
-    reason = (
-        f"if({invalid_date_digit},"
-        "'ログの処理日がYYYY-MM-DD形式ではありません。',"
-        f"{reason})"
-    )
-    reason = (
-        f"if(not(equals(substring({line0},12,1),'-')),"
-        "'ログの処理日がYYYY-MM-DD形式ではありません。',"
-        f"{reason})"
-    )
-    reason = (
-        f"if(not(equals(substring({line0},9,1),'-')),"
-        "'ログの処理日がYYYY-MM-DD形式ではありません。',"
-        f"{reason})"
-    )
-    reason = (
-        f"if(not(equals(length({line0}),15)),"
-        "'ログの処理日がYYYY-MM-DD形式ではありません。',"
-        f"{reason})"
-    )
-    reason = (
-        f"if(not(startsWith({line0},'処理日: ')),"
-        "'ログの冒頭に処理日行（処理日: YYYY-MM-DD）がありません。',"
-        f"{reason})"
-    )
-    reason = (
         "if(empty(outputs('Compose_LogFileName')),'ログのファイル名を読み取れません。',"
         f"{reason})"
     )
@@ -389,7 +333,7 @@ def _readback_expression(
         f"equals({row}['LogFileName'],outputs('Compose_LogFileName'))",
         f"equals({row}['Environment'],outputs('Get_case')?['body/cr6cb_environment'])",
         f"equals({row}['Server'],outputs('Get_case')?['body/cr6cb_server'])",
-        f"startsWith(string({row}['TargetDate']),formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd'))",
+        f"equals(string(coalesce({row}['TargetDate'],'')),if(empty(outputs('Get_case')?['body/cr6cb_targetdate']),'',formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd')))",
         f"equals(string({row}['ChunkIndex']),'1')",
         f"equals(string({row}['ChunkCount']),'1')",
         f"equals({row}['LogTextPart'],outputs('Compose_LogText'))",
@@ -1397,13 +1341,12 @@ def _mq_child_role_gate_expression(schema: MqChildAttachmentSchema) -> str:
     return "@and(" + ",".join(predicates) + ")"
 
 
-def _mq_expected_readback_gate(expression: str) -> str:
-    if not expression.startswith("@and(") or not expression.endswith(")"):
-        raise ValueError("MQ candidate expected an AND-based Evidence readback expression")
+def _mq_result_readback_gate_expression() -> str:
     return (
-        expression[:-1]
-        + ",equals(outputs('Compose_MQ_Result_Readback_MQ')?['ok'],true)"
-        + ",equals(outputs('Compose_MQ_Result_Readback_MQ')?['caseId'],outputs('Compose_CaseId')))"
+        "@and(equals(outputs('Compose_MQ_Result_Readback_MQ')?['ok'],true),"
+        "equals(outputs('Compose_MQ_Result_Readback_MQ')?['caseId'],outputs('Compose_CaseId')),"
+        "equals(outputs('Compose_MQ_Result_Readback_MQ')?['resultText'],"
+        "outputs('Compose_MQ_Result_Write_MQ')?['resultText']))"
     )
 
 
@@ -1499,35 +1442,56 @@ def build_mq_candidate(
         {"Run_MQ_Input_Validation": ["Succeeded"]},
     )
 
-    # Rebuild the Evidence write/readback scope using MQ-specific action names.
+    # Keep the existing template copy, but write and verify only the MQ report.
     original_scope_actions = original_destination["actions"]["Scope_Write_And_Verify"]["actions"]
-    scope_actions = _rename_action_subtree(
+    template_scope_actions = _rename_action_subtree(
         {"actions": copy.deepcopy(original_scope_actions)}, "_MQ"
     )["actions"]
-    scope_actions = _rewrite_action_references(
-        scope_actions,
-        {
-            "Compose_LogFileName": "Compose_LogFileName_MQ",
-            "Compose_LogText": "Compose_LogText_MQ",
-        },
+    template_readback_gate = _find_action(
+        template_scope_actions, "Condition_Readback_Matches_MQ"
     )
-    for name in ("Replace_template_row_MQ", "Read_back_evidence_MQ", "Read_back_evidence_retry_MQ"):
-        action = _find_action(scope_actions, name)
-        if action is None:
-            raise ValueError(f"MQ Evidence action is missing: {name}")
-        parameters = action["inputs"]["parameters"]
-        parameters["file"] = "@outputs('Copy_template_MQ')?['body/Id']"
-        parameters["drive"] = "@first(body('Filter_active_destinations_MQ'))?['cr6cb_driveid']"
+    template_success_actions = (
+        template_readback_gate.get("actions", {})
+        if isinstance(template_readback_gate, dict)
+        else {}
+    )
+    excel_url_action = template_success_actions.get("Compose_ExcelUrl_MQ")
+    success_action = template_success_actions.get("Update_case_success_MQ")
+    readback_unknown_action = _find_action(
+        template_scope_actions, "Update_case_readback_unknown_MQ"
+    )
+    if (
+        not isinstance(excel_url_action, dict)
+        or not isinstance(success_action, dict)
+        or readback_unknown_action is None
+    ):
+        raise ValueError("MQ result readback status actions are missing")
+    excel_url_action = copy.deepcopy(excel_url_action)
+    success_action = copy.deepcopy(success_action)
+    readback_unknown_action = copy.deepcopy(readback_unknown_action)
+    excel_url_action["runAfter"] = {}
+    success_action["runAfter"] = {"Compose_ExcelUrl_MQ": ["Succeeded"]}
+    readback_unknown_action["runAfter"] = {}
+
+    source_files_expression = (
+        "addProperty(addProperty(json('{}'),'batch_input',"
+        f"first(body('Filter_MQ_Books'))?['{selected_attachment_schema.file_name_column}']),"
+        "'log',outputs('Compose_LogFileName_MQ'))"
+    )
+    result_input_json = (
+        "@string(addProperty(outputs('Compose_MQ_Input_Result'),"
+        f"'source_files',{source_files_expression}))"
+    )
 
     writer_action = _mq_script_action(
         "Run_MQ_Result_Write_MQ",
         file_expression="@outputs('Copy_template_MQ')?['body/Id']",
         script_placeholder=selected_script_ids["writer"],
         script_parameters={
-            "ScriptParameters/validationJson": "@string(outputs('Compose_MQ_Input_Result'))",
+            "ScriptParameters/validationJson": result_input_json,
             "ScriptParameters/caseId": "@outputs('Compose_CaseId')",
         },
-        run_after={"Replace_template_row_MQ": ["Succeeded"]},
+        run_after={},
         drive_expression="@first(body('Filter_active_destinations_MQ'))?['cr6cb_driveid']",
     )
     writer_result_compose = _compose(
@@ -1545,10 +1509,10 @@ def build_mq_candidate(
         file_expression="@outputs('Copy_template_MQ')?['body/Id']",
         script_placeholder=selected_script_ids["readback"],
         script_parameters={
-            "ScriptParameters/validationJson": "@string(outputs('Compose_MQ_Input_Result'))",
+            "ScriptParameters/validationJson": result_input_json,
             "ScriptParameters/caseId": "@outputs('Compose_CaseId')",
         },
-        run_after={"Compose_MQ_Result_Write_Gate_MQ": ["Succeeded"]},
+        run_after={"Delay_before_readback_MQ": ["Succeeded"]},
         drive_expression="@first(body('Filter_active_destinations_MQ'))?['cr6cb_driveid']",
     )
     result_readback_compose = _compose(
@@ -1556,30 +1520,27 @@ def build_mq_candidate(
         _mq_result_readback_expression("Run_MQ_Result_Readback_MQ"),
         {"Run_MQ_Result_Readback_MQ": ["Succeeded"]},
     )
-    scope_actions["Run_MQ_Result_Write_MQ"] = writer_action
-    scope_actions["Compose_MQ_Result_Write_MQ"] = writer_result_compose
-    scope_actions["Compose_MQ_Result_Write_Gate_MQ"] = writer_result_gate
-    scope_actions["Run_MQ_Result_Readback_MQ"] = result_read_action
-    scope_actions["Compose_MQ_Result_Readback_MQ"] = result_readback_compose
-    scope_actions["Delay_before_readback_MQ"]["runAfter"] = {
-        "Compose_MQ_Result_Readback_MQ": ["Succeeded"]
+    scope_actions = {
+        "Run_MQ_Result_Write_MQ": writer_action,
+        "Compose_MQ_Result_Write_MQ": writer_result_compose,
+        "Compose_MQ_Result_Write_Gate_MQ": writer_result_gate,
+        "Delay_before_readback_MQ": _delay(
+            "Delay_before_readback_MQ",
+            10,
+            {"Compose_MQ_Result_Write_Gate_MQ": ["Succeeded"]},
+        ),
+        "Run_MQ_Result_Readback_MQ": result_read_action,
+        "Compose_MQ_Result_Readback_MQ": result_readback_compose,
     }
-    initial_condition = _find_action(scope_actions, "Condition_Readback_Matches_MQ")
-    retry_condition = _find_action(scope_actions, "Condition_Readback_Retry_Matches_MQ")
-    if initial_condition is None or retry_condition is None:
-        raise ValueError("MQ independent Evidence readback conditions are missing")
-    initial_match_expression = _mq_expected_readback_gate(
-        initial_condition["expression"]["equals"][0]
-    )
-    retry_match_expression = _mq_expected_readback_gate(
-        retry_condition["expression"]["equals"][0]
-    )
-    combined_match_expression = (
-        "@and(or(equals(length(body('Read_back_evidence_MQ')?['value']),0),"
-        + initial_match_expression[1:]
-        + "),"
-        + retry_match_expression[1:]
-        + ")"
+    report_readback_gate = _condition(
+        "Condition_Readback_Matches_MQ",
+        {"equals": [_mq_result_readback_gate_expression(), True]},
+        {
+            "Compose_ExcelUrl_MQ": excel_url_action,
+            "Update_case_success_MQ": success_action,
+        },
+        {"Scope_Write_And_Verify_MQ": ["Succeeded"]},
+        {"Update_case_readback_unknown_MQ": readback_unknown_action},
     )
 
     # Persist the MQ summary only after both independent readbacks succeed.
@@ -1604,55 +1565,14 @@ def build_mq_candidate(
             "outputs('Compose_MQ_Result_Readback_MQ')?['resultText']",
         ),
     )
-    success_action = _find_action(scope_actions, "Update_case_success_MQ")
-    if success_action is None:
-        raise ValueError("MQ success action is missing")
     item = success_action["inputs"]["parameters"]["item"]
     item_expression = item[1:] if item.startswith("@") else item
     for logical_name, value_expression in mq_result_properties:
         item_expression = f"addProperty({item_expression},'{logical_name}',{value_expression})"
     success_action["inputs"]["parameters"]["item"] = "@" + item_expression
 
-    # Keep both independent Evidence reads inside the write/verify scope so
-    # any read or wait failure reaches the existing post-copy unknown handler.
-    # The single result gate sits beside the scope to stay within the live
-    # flow's maximum nesting depth. It accepts an empty first read only when
-    # the second read matches; otherwise both reads must independently match.
-    readback_empty_condition = scope_actions.pop("Condition_Readback_Is_Empty_MQ", None)
-    if not isinstance(readback_empty_condition, dict):
-        raise ValueError("MQ initial readback condition is missing")
-    retry_actions = readback_empty_condition.get("actions")
-    if not isinstance(retry_actions, dict):
-        raise ValueError("MQ retry readback branch is missing")
-    retry_delay = retry_actions.get("Delay_before_readback_retry_MQ")
-    retry_read = retry_actions.get("Read_back_evidence_retry_MQ")
-    retry_condition = retry_actions.get("Condition_Readback_Retry_Matches_MQ")
-    if not all(isinstance(action, dict) for action in (retry_delay, retry_read, retry_condition)):
-        raise ValueError("MQ retry readback actions are incomplete")
-    initial_branch_actions = readback_empty_condition.get("else", {}).get("actions", {})
-    if not isinstance(initial_branch_actions, dict):
-        raise ValueError("MQ initial match branch is missing")
-    initial_condition = initial_branch_actions.get("Condition_Readback_Matches_MQ")
-    if not isinstance(initial_condition, dict):
-        raise ValueError("MQ initial match condition is missing")
-
-    retry_delay["runAfter"] = {"Read_back_evidence_MQ": ["Succeeded"]}
-    retry_read["runAfter"] = {"Delay_before_readback_retry_MQ": ["Succeeded"]}
-    scope_actions["Delay_before_readback_retry_MQ"] = retry_delay
-    scope_actions["Read_back_evidence_retry_MQ"] = retry_read
-    initial_condition["runAfter"] = {"Scope_Write_And_Verify_MQ": ["Succeeded"]}
-    initial_condition["expression"] = {"equals": [combined_match_expression, True]}
-    initial_condition["metadata"]["operationMetadataId"] = _metadata_id(
-        "Condition_Readback_Matches_MQ:combined"
-    )
-
-    for action_name, action in _all_actions(scope_actions):
-        metadata = action.get("metadata")
-        if isinstance(metadata, dict) and "operationMetadataId" in metadata:
-            metadata["operationMetadataId"] = _metadata_id(f"mq:{action_name}")
-
-    # All input validation happens before Copy_template_MQ. The copied
-    # workbook retains Evidence and receives a separate MQ_Comparison sheet.
+    # The existing template is copied only after input validation. Its legacy
+    # Evidence sheet is removed by the writer after the MQ result is complete.
     copy_result_template = _openapi(
         "Copy_template_MQ",
         ONEDRIVE_API,
@@ -1754,7 +1674,7 @@ def build_mq_candidate(
                 "type": "Scope",
                 "actions": scope_actions,
             },
-            "Condition_Readback_Matches_MQ": initial_condition,
+            "Condition_Readback_Matches_MQ": report_readback_gate,
             "Update_case_readback_condition_unknown_MQ": _update_case(
                 "Update_case_readback_condition_unknown_MQ",
                 _failure_item(
@@ -2234,9 +2154,12 @@ def validate_mq_candidate(
             or not isinstance(reader_parameters, dict)
             or "ScriptParameters/caseId" not in writer_parameters
             or "ScriptParameters/caseId" not in reader_parameters
-            or writer.get("runAfter") != {"Replace_template_row_MQ": ["Succeeded"]}
+            or "source_files" not in writer_parameters.get("ScriptParameters/validationJson", "")
+            or writer_parameters.get("ScriptParameters/validationJson")
+            != reader_parameters.get("ScriptParameters/validationJson")
+            or writer.get("runAfter") != {}
         ):
-            errors.append("MQ writer and independent readback must receive caseId after Evidence write")
+            errors.append("MQ writer and readback must receive matching case and source-file metadata")
     if (
         not isinstance(writer_result, dict)
         or writer_result.get("type") != "Compose"
@@ -2248,39 +2171,38 @@ def validate_mq_candidate(
         != "@div(1,if(equals(outputs('Compose_MQ_Result_Write_MQ')?['ok'],true),1,0))"
         or writer_gate.get("runAfter") != {"Compose_MQ_Result_Write_MQ": ["Succeeded"]}
         or not isinstance(result_reader, dict)
-        or result_reader.get("runAfter") != {"Compose_MQ_Result_Write_Gate_MQ": ["Succeeded"]}
+        or result_reader.get("runAfter") != {"Delay_before_readback_MQ": ["Succeeded"]}
     ):
         errors.append("MQ writer result must gate readback on ok=true and preserve the unknown failure path")
-    evidence_scope = _find_action(actions, "Scope_Write_And_Verify_MQ")
-    if not isinstance(evidence_scope, dict) or not isinstance(evidence_scope.get("actions"), dict):
-        errors.append("MQ Evidence write and both readbacks must remain in one failure-handling scope")
-        evidence_scope_actions: dict[str, Any] = {}
+    result_scope = _find_action(actions, "Scope_Write_And_Verify_MQ")
+    if not isinstance(result_scope, dict) or not isinstance(result_scope.get("actions"), dict):
+        errors.append("MQ result write and readback must remain in one failure-handling scope")
+        result_scope_actions: dict[str, Any] = {}
     else:
-        evidence_scope_actions = evidence_scope["actions"]
-    initial_read = evidence_scope_actions.get("Read_back_evidence_MQ")
-    retry_delay = evidence_scope_actions.get("Delay_before_readback_retry_MQ")
-    retry_read = evidence_scope_actions.get("Read_back_evidence_retry_MQ")
+        result_scope_actions = result_scope["actions"]
+    readback_delay = result_scope_actions.get("Delay_before_readback_MQ")
+    readback_compose = result_scope_actions.get("Compose_MQ_Result_Readback_MQ")
     if (
-        not isinstance(initial_read, dict)
-        or not isinstance(retry_delay, dict)
-        or not isinstance(retry_read, dict)
-        or initial_read.get("runAfter") != {"Delay_before_readback_MQ": ["Succeeded"]}
-        or retry_delay.get("runAfter") != {"Read_back_evidence_MQ": ["Succeeded"]}
-        or retry_read.get("runAfter") != {"Delay_before_readback_retry_MQ": ["Succeeded"]}
+        not isinstance(readback_delay, dict)
+        or readback_delay.get("type") != "Wait"
+        or readback_delay.get("runAfter") != {"Compose_MQ_Result_Write_Gate_MQ": ["Succeeded"]}
+        or readback_delay.get("inputs", {}).get("interval") != {"count": 10, "unit": "Second"}
+        or not isinstance(readback_compose, dict)
+        or readback_compose.get("runAfter") != {"Run_MQ_Result_Readback_MQ": ["Succeeded"]}
     ):
-        errors.append("MQ must perform an independent second Evidence read only after the initial read succeeds")
+        errors.append("MQ result readback must follow a successful writer gate and its delay")
     if any(
-        name in evidence_scope_actions
+        name in result_scope_actions
         for name in (
-            "Condition_Readback_Is_Empty_MQ",
-            "Condition_Readback_Matches_MQ",
-            "Condition_Readback_Retry_Matches_MQ",
+            "Replace_template_row_MQ",
+            "Read_back_evidence_MQ",
+            "Read_back_evidence_retry_MQ",
         )
     ):
-        errors.append("MQ readback decision conditions must stay outside the write/verify scope")
+        errors.append("MQ result workbook must not receive an Evidence row or separate Evidence reads")
     readback_gate = _find_action(actions, "Condition_Readback_Matches_MQ")
     readback_expression = (
-        json.dumps(readback_gate.get("expression", {}), ensure_ascii=False)
+        readback_gate.get("expression", {}).get("equals", [""])[0]
         if isinstance(readback_gate, dict)
         else ""
     )
@@ -2288,14 +2210,11 @@ def validate_mq_candidate(
         not isinstance(readback_gate, dict)
         or readback_gate.get("type") != "If"
         or readback_gate.get("runAfter") != {"Scope_Write_And_Verify_MQ": ["Succeeded"]}
-        or "Read_back_evidence_MQ" not in readback_expression
-        or "Read_back_evidence_retry_MQ" not in readback_expression
-        or "Compose_MQ_Result_Readback_MQ" not in readback_expression
-        or "or(equals(length(body('Read_back_evidence_MQ')?['value']),0)" not in readback_expression
+        or readback_expression != _mq_result_readback_gate_expression()
         or "Update_case_success_MQ" not in readback_gate.get("actions", {})
         or "Update_case_readback_unknown_MQ" not in readback_gate.get("else", {}).get("actions", {})
     ):
-        errors.append("MQ success must require the retry match and either an empty initial read or an initial match")
+        errors.append("MQ success must require a matching one-sheet report readback")
     condition_unknown = _find_action(actions, "Update_case_readback_condition_unknown_MQ")
     if (
         not isinstance(condition_unknown, dict)
@@ -2310,7 +2229,7 @@ def validate_mq_candidate(
         or "outputs('Compose_MQ_Result_Write_MQ')?['error']"
         not in unknown.get("inputs", {}).get("parameters", {}).get("item", "")
     ):
-        errors.append("MQ copy, Evidence write, MQ sheet write, and readback failures must stay 結果不明 with the writer reason when available")
+        errors.append("MQ copy, report write, or readback failures must stay 結果不明 with the writer reason when available")
     validation_unknown = _find_action(actions, "Update_case_mq_validation_condition_unknown")
     validation_unknown_item = (
         validation_unknown.get("inputs", {}).get("parameters", {}).get("item", "")

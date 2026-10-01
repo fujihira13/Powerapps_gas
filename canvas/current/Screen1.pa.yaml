@@ -1,0 +1,1002 @@
+Screens:
+  Screen1:
+    Properties:
+      Fill: =RGBA(255, 255, 255, 1)
+      LoadingSpinnerColor: =RGBA(0, 120, 212, 1)
+      OnVisible: |-
+        =If(
+          Coalesce(varS01NewIntakeRequested, false) && !varT001Saving && !Coalesce(varS01Starting, false) && !Coalesce(varS01StartUnknown, false),
+          Set(varS01NewIntakeRequested, false);
+          Set(varT001Saved, Blank());
+          Set(varEvidenceCase, Blank());
+          Set(varT001SaveUnknown, false);
+          Set(varS01FlowStatus, "");
+          ResetForm(Form1);
+          NewForm(Form1);
+          ResetForm(frmS01OneExcel);
+          NewForm(frmS01OneExcel);
+          ResetForm(frmS01OneLog);
+          NewForm(frmS01OneLog)
+        )
+    Children:
+      - Form1:
+          Control: Form@2.4.4
+          Variant: Classic
+          Layout: Vertical
+          Properties:
+            BorderColor: =RGBA(245, 245, 245, 1)
+            DataSource: ='架空ログ証跡件'
+            DefaultMode: =FormMode.New
+            Height: =If(App.Width < 720, 220, 110)
+            NumberOfColumns: =If(App.Width < 720, 1, 2)
+            OnFailure: |-
+              =Set(varT001Saving, false);
+              Set(varT001SaveUnknown, true);
+              Set(varS01FlowStatus, "保存結果を確認できません。進捗一覧で状態を確認してください。");
+              Notify("保存結果を確認できません。再保存せず進捗一覧で状態を確認してください", NotificationType.Error)
+            OnSuccess: |-
+              =Set(varT001SubmittedCaseId, Form1.LastSubmit.架空ログ証跡件);
+              Set(varT001ReadbackRefreshOk, true);
+              IfError(Refresh('架空ログ証跡件'), Set(varT001ReadbackRefreshOk, false));
+              Set(varT001ReadbackCase, If(varT001ReadbackRefreshOk, IfError(LookUp('架空ログ証跡件', 架空ログ証跡件 = varT001SubmittedCaseId), Blank()), Blank()));
+              If(
+                !IsBlank(varT001ReadbackCase.架空ログ証跡件) &&
+                varT001ReadbackCase.作成日 = Form1.LastSubmit.作成日 &&
+                varT001ReadbackCase.件の表示名 = varT001SavingLogName &&
+                varT001ReadbackCase.バッチExcelファイル名 = varT001SavingWorkbookName &&
+                varT001ReadbackCase.環境 = varT001SavingEnvironment &&
+                varT001ReadbackCase.サーバー = varT001SavingServer &&
+                varT001ReadbackCase.処理状態 = "停止",
+                Set(varT001Saved, varT001ReadbackCase);
+                Set(varS01FlowStatus, "親件を確認しました。ログファイルを保存しています");
+                SubmitForm(frmS01OneLog),
+                Set(varT001Saving, false);
+                Set(varT001SaveUnknown, true);
+                Set(varS01FlowStatus, "親件の保存結果を読み戻せません。進捗一覧で確認してください");
+                Notify("親件を確認できませんでした。再保存せず進捗一覧で状態を確認してください", NotificationType.Error)
+              )
+            SnapToColumns: =false
+            Width: =Parent.Width - 50
+            X: =25
+            Y: =If(IsBlank(lblT001MqMode.Text), lblT001MqMode.Y, lblT001MqMode.Y + lblT001MqMode.Height + 8)
+          Children:
+            - ログ名_DataCard1:
+                Control: TypedDataCard@1.0.7
+                Variant: ClassicTextualEdit
+                IsLocked: true
+                Properties:
+                  BorderColor: =RGBA(245, 245, 245, 1)
+                  DataField: ="cr6cb_caselabel"
+                  Default: =ThisItem.件の表示名
+                  DisplayName: ="ログ"
+                  MaxLength: =DataSourceInfo([@'架空ログ証跡件'], DataSourceInfo.MaxLength, 件の表示名)
+                  Required: =true
+                  Update: =DataCardValue1.Text
+                  Visible: =false
+                  Width: =0
+                  X: =0
+                  Y: =0
+                Children:
+                  - DataCardKey1:
+                      Control: Label@2.5.1
+                      MetadataKey: FieldName
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =34
+                        PaddingLeft: =0
+                        Text: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        Wrap: =false
+                        X: =30
+                        Y: =10
+                  - DataCardValue1:
+                      Control: Classic/TextInput@2.3.2
+                      MetadataKey: FieldValue
+                      Properties:
+                        BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                        Color: =RGBA(50, 49, 48, 1)
+                        Default: =With({logFile:LookUp(attS01OneLog.Attachments As selectedFile, EndsWith(Lower(selectedFile.Name), ".txt"))}, Coalesce(logFile.Name, ""))
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        DisplayMode: =DisplayMode.View
+                        Font: =Font.'Segoe UI'
+                        HoverBorderColor: =RGBA(16, 110, 190, 1)
+                        HoverColor: =RGBA(50, 49, 48, 1)
+                        HoverFill: =RGBA(255, 255, 255, 1)
+                        MaxLength: =Parent.MaxLength
+                        PaddingLeft: =5
+                        PressedBorderColor: =RGBA(0, 120, 212, 1)
+                        PressedColor: =RGBA(50, 49, 48, 1)
+                        PressedFill: =RGBA(255, 255, 255, 1)
+                        RadiusBottomLeft: =0
+                        RadiusBottomRight: =0
+                        RadiusTopLeft: =0
+                        RadiusTopRight: =0
+                        Tooltip: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardKey1.Y + DataCardKey1.Height + 5
+                  - ErrorMessage1:
+                      Control: Label@2.5.1
+                      MetadataKey: ErrorMessage
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(168, 0, 0, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(168, 0, 0, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =10
+                        Live: =Live.Assertive
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Text: =Parent.Error
+                        Visible: =Parent.DisplayMode=DisplayMode.Edit
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardValue1.Y + DataCardValue1.Height
+                  - StarVisible1:
+                      Control: Label@2.5.1
+                      MetadataKey: FieldRequired
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =DataCardKey1.Height
+                        PaddingLeft: =0
+                        Text: ="*"
+                        Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                        Width: =30
+                        Wrap: =false
+                        Y: =DataCardKey1.Y
+            - サーバー名_DataCard1:
+                Control: TypedDataCard@1.0.7
+                Variant: ClassicTextualEdit
+                IsLocked: true
+                Properties:
+                  BorderColor: =RGBA(245, 245, 245, 1)
+                  DataField: ="cr6cb_server"
+                  Default: =ThisItem.サーバー
+                  DisplayName: ="サーバー"
+                  MaxLength: =DataSourceInfo([@'架空ログ証跡件'], DataSourceInfo.MaxLength, サーバー)
+                  Required: =true
+                  Update: =DataCardValue3.Selected.Value
+                  Width: =If(App.Width < 720, App.Width - 50, (App.Width - 50) / 2)
+                  X: =If(App.Width < 720, 0, 1)
+                  Y: =If(App.Width < 720, 1, 0)
+                Children:
+                  - DataCardKey3:
+                      Control: Label@2.5.1
+                      MetadataKey: FieldName
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =34
+                        PaddingLeft: =0
+                        Text: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        Wrap: =false
+                        X: =30
+                        Y: =10
+                  - DataCardValue3:
+                      Control: Classic/DropDown@2.3.1
+                      MetadataKey: FieldValue
+                      Properties:
+                        BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                        Color: =RGBA(50, 49, 48, 1)
+                        Default: =""
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        DisplayMode: =If(varT001Saving || Coalesce(varT001SaveUnknown, false) || !IsBlank(varT001Saved.架空ログ証跡件) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, Parent.DisplayMode)
+                        Font: =Font.'Segoe UI'
+                        HoverBorderColor: =RGBA(16, 110, 190, 1)
+                        HoverColor: =RGBA(50, 49, 48, 1)
+                        HoverFill: =RGBA(255, 255, 255, 1)
+                        Items: =Sort(AddColumns(Distinct(Filter('架空ログ転記先', cr6cb_isactive = '有効 (架空ログ転記先)'.有効 && cr6cb_environment = DataCardValue2.Selected.Value), cr6cb_server), DisplayName, Substitute(Value, "架空", "")), DisplayName)
+                        Items.Value: =DisplayName
+                        PaddingLeft: =5
+                        PressedBorderColor: =RGBA(0, 120, 212, 1)
+                        PressedColor: =RGBA(50, 49, 48, 1)
+                        PressedFill: =RGBA(255, 255, 255, 1)
+                        Tooltip: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardKey3.Y + DataCardKey3.Height + 5
+                  - ErrorMessage3:
+                      Control: Label@2.5.1
+                      MetadataKey: ErrorMessage
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(168, 0, 0, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(168, 0, 0, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =10
+                        Live: =Live.Assertive
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Text: =Parent.Error
+                        Visible: =Parent.DisplayMode=DisplayMode.Edit
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardValue3.Y + DataCardValue3.Height
+                  - StarVisible3:
+                      Control: Label@2.5.1
+                      MetadataKey: FieldRequired
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =DataCardKey3.Height
+                        PaddingLeft: =0
+                        Text: ="*"
+                        Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                        Width: =30
+                        Wrap: =false
+                        Y: =DataCardKey3.Y
+            - 環境名_DataCard1:
+                Control: TypedDataCard@1.0.7
+                Variant: ClassicTextualEdit
+                IsLocked: true
+                Properties:
+                  BorderColor: =RGBA(245, 245, 245, 1)
+                  DataField: ="cr6cb_environment"
+                  Default: =ThisItem.環境
+                  DisplayName: ="環境"
+                  MaxLength: =DataSourceInfo([@'架空ログ証跡件'], DataSourceInfo.MaxLength, 環境)
+                  Required: =true
+                  Update: =DataCardValue2.Selected.Value
+                  Width: =If(App.Width < 720, App.Width - 50, (App.Width - 50) / 2)
+                  X: =0
+                  Y: =0
+                Children:
+                  - DataCardKey2:
+                      Control: Label@2.5.1
+                      MetadataKey: FieldName
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =34
+                        PaddingLeft: =0
+                        Text: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        Wrap: =false
+                        X: =30
+                        Y: =10
+                  - DataCardValue2:
+                      Control: Classic/DropDown@2.3.1
+                      MetadataKey: FieldValue
+                      Properties:
+                        BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+                        Color: =RGBA(50, 49, 48, 1)
+                        Default: =""
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        DisabledFill: =RGBA(242, 242, 241, 0)
+                        DisplayMode: =If(varT001Saving || Coalesce(varT001SaveUnknown, false) || !IsBlank(varT001Saved.架空ログ証跡件) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, Parent.DisplayMode)
+                        Font: =Font.'Segoe UI'
+                        HoverBorderColor: =RGBA(16, 110, 190, 1)
+                        HoverColor: =RGBA(50, 49, 48, 1)
+                        HoverFill: =RGBA(255, 255, 255, 1)
+                        Items: =Sort(Filter(AddColumns(Distinct(Filter('架空ログ転記先', cr6cb_isactive = '有効 (架空ログ転記先)'.有効), cr6cb_environment), DisplayName, Substitute(Value, "架空", "")), DisplayName <> "環境長文"), DisplayName)
+                        Items.Value: =DisplayName
+                        PaddingLeft: =5
+                        PressedBorderColor: =RGBA(0, 120, 212, 1)
+                        PressedColor: =RGBA(50, 49, 48, 1)
+                        PressedFill: =RGBA(255, 255, 255, 1)
+                        Tooltip: =Parent.DisplayName
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardKey2.Y + DataCardKey2.Height + 5
+                  - ErrorMessage2:
+                      Control: Label@2.5.1
+                      MetadataKey: ErrorMessage
+                      Properties:
+                        AutoHeight: =true
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(168, 0, 0, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(168, 0, 0, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =10
+                        Live: =Live.Assertive
+                        PaddingBottom: =0
+                        PaddingLeft: =0
+                        PaddingRight: =0
+                        PaddingTop: =0
+                        Text: =Parent.Error
+                        Visible: =Parent.DisplayMode=DisplayMode.Edit
+                        Width: =Parent.Width - 60
+                        X: =30
+                        Y: =DataCardValue2.Y + DataCardValue2.Height
+                  - StarVisible2:
+                      Control: Label@2.5.1
+                      MetadataKey: FieldRequired
+                      Properties:
+                        Align: =Align.Center
+                        BorderColor: =RGBA(0, 0, 0, 0)
+                        BorderStyle: =BorderStyle.None
+                        BorderThickness: =2
+                        Color: =RGBA(50, 49, 48, 1)
+                        DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                        DisabledColor: =RGBA(161, 159, 157, 1)
+                        FocusedBorderThickness: =4
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =DataCardKey2.Height
+                        PaddingLeft: =0
+                        Text: ="*"
+                        Visible: =And(Parent.Required, Parent.DisplayMode=DisplayMode.Edit)
+                        Width: =30
+                        Wrap: =false
+                        Y: =DataCardKey2.Y
+            - s01OneInitialStatus_DataCard:
+                Control: TypedDataCard@1.0.7
+                Variant: ClassicTextualEdit
+                Properties:
+                  DataField: ="cr6cb_processingstatus"
+                  Default: =ThisItem.処理状態
+                  DisplayName: ="受付状態"
+                  Height: =1
+                  MaxLength: =255
+                  Required: =false
+                  Update: ="停止"
+                  Visible: =false
+                  Width: =0
+                  X: =0
+                  Y: =2
+            - s01OneWorkbookName_DataCard:
+                Control: TypedDataCard@1.0.7
+                Variant: ClassicTextualEdit
+                Properties:
+                  DataField: ="cr6cb_batchfilename"
+                  Default: =ThisItem.バッチExcelファイル名
+                  DisplayName: ="更新対象一覧のファイル名"
+                  Height: =1
+                  MaxLength: =255
+                  Required: =false
+                  Update: =varT001SavingWorkbookName
+                  Visible: =false
+                  Width: =0
+                  X: =1
+                  Y: =2
+      - frmS01OneLog:
+          Control: Form@2.4.4
+          Variant: Classic
+          Layout: Vertical
+          Properties:
+            DataSource: ='件別ファイル'
+            DefaultMode: =FormMode.New
+            Height: =155
+            Item: =Defaults('件別ファイル')
+            NumberOfColumns: =1
+            OnFailure: |-
+              =Set(varT001Saving, false);
+              Set(varT001SaveUnknown, true);
+              Set(varS01FlowStatus, "ログ添付の保存結果を確認できません。進捗一覧で確認してください");
+              IfError(Patch('架空ログ証跡件', varT001ReadbackCase, {処理状態:"停止", 停止理由:"ログ添付の保存結果不明"}), Blank());
+              Navigate(Screen2, ScreenTransition.None)
+            OnSuccess: |-
+              =Set(varS01LogChildId, frmS01OneLog.LastSubmit.件別ファイル);
+              Set(varS01ChildReadbackOk, true);
+              IfError(Refresh('件別ファイル'), Set(varS01ChildReadbackOk, false));
+              Set(varS01ReadbackLog, If(varS01ChildReadbackOk, IfError(LookUp('件別ファイル', 件別ファイル = varS01LogChildId), Blank()), Blank()));
+              If(
+                !IsBlank(varS01ReadbackLog.件別ファイル) &&
+                varS01ReadbackLog.対象件.架空ログ証跡件 = varT001SubmittedCaseId &&
+                varS01ReadbackLog.ファイル種別 = "log" &&
+                varS01ReadbackLog.ファイル名 = varT001SavingLogName &&
+                CountRows(varS01ReadbackLog.Attachments) = 1 &&
+                CountIf(varS01ReadbackLog.Attachments As savedFile, savedFile.DisplayName = varT001SavingLogName) = 1,
+                Set(varS01FlowStatus, "ログを読み戻しました。Excelを保存しています");
+                SubmitForm(frmS01OneExcel),
+                Set(varT001Saving, false);
+                Set(varT001SaveUnknown, true);
+                Set(varS01FlowStatus, "ログ添付の読戻しが一致しません。再保存せず進捗一覧で確認してください");
+                IfError(Patch('架空ログ証跡件', varT001ReadbackCase, {処理状態:"停止", 停止理由:"ログ添付の読戻し不一致"}), Blank());
+                Navigate(Screen2, ScreenTransition.None)
+              )
+            Width: =If(Parent.Width < 720, Parent.Width - 50, Min(600, (Parent.Width - 66) / 2))
+            X: =If(Parent.Width < 720, 25, frmS01OneExcel.X + frmS01OneExcel.Width + 16)
+            Y: =If(Parent.Width < 720, frmS01OneExcel.Y + frmS01OneExcel.Height + 8, frmS01OneExcel.Y)
+          Children:
+            - cardS01OneLogParent:
+                Control: TypedDataCard@1.0.7
+                Variant: ClassicComboBoxEdit
+                Properties:
+                  DataField: ="cr6cb_evidencecase"
+                  Default: =ThisItem.cr6cb_evidencecase
+                  DisplayName: ="親件"
+                  Height: =1
+                  Required: =true
+                  Update: =varT001ReadbackCase
+                  Visible: =false
+                  Width: =1
+                  X: =0
+                  Y: =0
+            - cardS01OneLogRole:
+                Control: TypedDataCard@1.0.7
+                Variant: ClassicTextualEdit
+                Properties:
+                  DataField: ="cr6cb_filerole"
+                  Default: =ThisItem.cr6cb_filerole
+                  DisplayName: ="ファイル役割"
+                  Height: =1
+                  MaxLength: =255
+                  Required: =true
+                  Update: ="log"
+                  Visible: =false
+                  Width: =1
+                  X: =0
+                  Y: =1
+            - cardS01OneLogName:
+                Control: TypedDataCard@1.0.7
+                Variant: ClassicTextualEdit
+                Properties:
+                  DataField: ="cr6cb_filename"
+                  Default: =ThisItem.cr6cb_filename
+                  DisplayName: ="ファイル名"
+                  Height: =1
+                  MaxLength: =255
+                  Required: =true
+                  Update: =varT001SavingLogName
+                  Visible: =false
+                  Width: =1
+                  X: =0
+                  Y: =2
+            - cardS01OneLogAttachment:
+                Control: TypedDataCard@1.0.7
+                Variant: ClassicAttachmentsEdit
+                Properties:
+                  BorderColor: =RGBA(245, 245, 245, 1)
+                  DataField: ="{Attachments}"
+                  Default: =ThisItem.Attachments
+                  DisplayName: ="サーバーログ（txt）"
+                  Height: =146
+                  Required: =true
+                  Update: =attS01OneLog.Attachments
+                  Width: =Parent.Width - 24
+                  X: =0
+                  Y: =3
+                Children:
+                  - lblS01OneLogAttachment:
+                      Control: Label@2.5.1
+                      Properties:
+                        AutoHeight: =true
+                        Color: =RGBA(42, 57, 75, 1)
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =28
+                        Text: =Parent.DisplayName & If(CountRows(attS01OneLog.Attachments) = 1, Char(10) & First(attS01OneLog.Attachments).Name, "")
+                        Width: =Parent.Width - 12
+                        X: =6
+                  - attS01OneLog:
+                      Control: Attachments@2.3.0
+                      MetadataKey: FieldValue
+                      Properties:
+                        AccessibleLabel: ="サーバーログ .txt 1件"
+                        AddAttachmentText: ="ログを添付"
+                        BorderStyle: =BorderStyle.None
+                        DisplayMode: =If(varT001Saving || Coalesce(varT001SaveUnknown, false) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, CountRows(Self.Attachments) > 0, DisplayMode.View, DisplayMode.Edit)
+                        Fill: =RGBA(255,255,255,0)
+                        Height: =If(CountRows(Self.Attachments) = 0, 112, 64)
+                        Items: =Parent.Default
+                        MaxAttachments: =1
+                        MaxAttachmentsText: =""
+                        NoAttachmentsText: =""
+                        Visible: =CountRows(Self.Attachments) = 0
+                        Width: =Min(480, Parent.Width - 12)
+                        X: =6
+                        Y: =-20
+                  - btnS01LogChange:
+                      Control: Button@0.0.45
+                      Properties:
+                        AccessibleLabel: ="変更"
+                        Appearance: ='ButtonCanvas.Appearance'.Secondary
+                        DisplayMode: =If(varT001Saving || Coalesce(varT001SaveUnknown, false) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, DisplayMode.Edit)
+                        Height: =36
+                        OnSelect: =If(!(varT001Saving || Coalesce(varT001SaveUnknown, false) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false)), Reset(attS01OneLog))
+                        Text: ="変更"
+                        Visible: =CountRows(attS01OneLog.Attachments) = 1
+                        Width: =90
+                        X: =6
+                        Y: =80
+                  - btnS01LogRemove:
+                      Control: Button@0.0.45
+                      Properties:
+                        AccessibleLabel: ="削除"
+                        Appearance: ='ButtonCanvas.Appearance'.Secondary
+                        DisplayMode: =If(varT001Saving || Coalesce(varT001SaveUnknown, false) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, DisplayMode.Edit)
+                        Height: =36
+                        OnSelect: =If(!(varT001Saving || Coalesce(varT001SaveUnknown, false) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false)), Reset(attS01OneLog))
+                        Text: ="削除"
+                        Visible: =CountRows(attS01OneLog.Attachments) = 1
+                        Width: =90
+                        X: =106
+                        Y: =80
+      - frmS01OneExcel:
+          Control: Form@2.4.4
+          Variant: Classic
+          Layout: Vertical
+          Properties:
+            DataSource: ='件別ファイル'
+            DefaultMode: =FormMode.New
+            Height: =155
+            Item: =Defaults('件別ファイル')
+            NumberOfColumns: =1
+            OnFailure: |-
+              =Set(varT001Saving, false);
+              Set(varT001SaveUnknown, true);
+              Set(varS01FlowStatus, "Excel添付の保存結果を確認できません。進捗一覧で確認してください");
+              IfError(Patch('架空ログ証跡件', varT001ReadbackCase, {処理状態:"停止", 停止理由:"Excel添付の保存結果不明"}), Blank());
+              Navigate(Screen2, ScreenTransition.None)
+            OnSuccess: |-
+              =Set(varS01ExcelChildId, frmS01OneExcel.LastSubmit.件別ファイル);
+              Set(varS01ChildReadbackOk, true);
+              IfError(Refresh('件別ファイル'), Set(varS01ChildReadbackOk, false));
+              Set(varS01ReadbackExcel, If(varS01ChildReadbackOk, IfError(LookUp('件別ファイル', 件別ファイル = varS01ExcelChildId), Blank()), Blank()));
+              Set(varS01ReadbackLog, If(varS01ChildReadbackOk, IfError(LookUp('件別ファイル', 件別ファイル = varS01LogChildId), Blank()), Blank()));
+              If(
+                !IsBlank(varS01ReadbackExcel.件別ファイル) &&
+                varS01ReadbackExcel.対象件.架空ログ証跡件 = varT001SubmittedCaseId &&
+                varS01ReadbackExcel.ファイル種別 = "excel" &&
+                varS01ReadbackExcel.ファイル名 = varT001SavingWorkbookName &&
+                CountRows(varS01ReadbackExcel.Attachments) = 1 &&
+                CountIf(varS01ReadbackExcel.Attachments As savedFile, savedFile.DisplayName = varT001SavingWorkbookName) = 1 &&
+                !IsBlank(varS01ReadbackLog.件別ファイル) &&
+                varS01ReadbackLog.対象件.架空ログ証跡件 = varT001SubmittedCaseId &&
+                varS01ReadbackLog.ファイル種別 = "log" &&
+                varS01ReadbackLog.ファイル名 = varT001SavingLogName &&
+                CountRows(varS01ReadbackLog.Attachments) = 1 &&
+                CountIf(varS01ReadbackLog.Attachments As savedFile, savedFile.DisplayName = varT001SavingLogName) = 1,
+                Set(varS01Starting, true);
+                Set(varS01FlowStatus, "2つのファイルを読み戻しました。照合を開始しています");
+                Set(varS01StartPatch, IfError(Patch('架空ログ証跡件', varT001ReadbackCase, {処理状態:"開始受付済み", 開始操作日時:Now(), Excel反映確認:"未確認", レビュー状態:"未依頼", 停止理由:""}), Blank()));
+                If(
+                  !IsBlank(varS01StartPatch.架空ログ証跡件),
+                  Set(varS01ReadbackRefreshOk, true);
+                  IfError(Refresh('架空ログ証跡件'), Set(varS01ReadbackRefreshOk, false));
+                  Set(varS01StartReadback, If(varS01ReadbackRefreshOk, IfError(LookUp('架空ログ証跡件', 架空ログ証跡件 = varT001SubmittedCaseId), Blank()), Blank()));
+                  If(
+                    !IsBlank(varS01StartReadback.架空ログ証跡件) && varS01StartReadback.処理状態 = "開始受付済み",
+                    IfError(
+                      '架空ログ証跡_件別Excel転記'.Run(Text(varT001SubmittedCaseId));
+                      Refresh('架空ログ証跡件');
+                      Set(varS01StartReadback, IfError(LookUp('架空ログ証跡件', 架空ログ証跡件 = varT001SubmittedCaseId), Blank()));
+                      If(
+                        !IsBlank(varS01StartReadback.架空ログ証跡件) &&
+                        (varS01StartReadback.処理状態 = "開始受付済み" || varS01StartReadback.処理状態 = "受付済み" || varS01StartReadback.処理状態 = "処理中" || varS01StartReadback.処理状態 = "停止" || varS01StartReadback.処理状態 = "結果不明" || varS01StartReadback.処理状態 = "転記済み"),
+                        Set(varT001Saved, varS01StartReadback);
+                        Set(varEvidenceCase, varS01StartReadback);
+                        Set(varT001Saving, false);
+                        Set(varS01Starting, false);
+                        Set(varS01FlowStatus, "照合を開始しました");
+                        Navigate(Screen2, ScreenTransition.None),
+                        Set(varT001Saving, false);
+                        Set(varT001SaveUnknown, true);
+                        Set(varS01StartUnknown, true);
+                        Set(varS01Starting, false);
+                        Set(varS01FlowStatus, "開始結果を確認できません。進捗一覧で確認してください")
+                      ),
+                      Set(varT001Saving, false);
+                      Set(varT001SaveUnknown, true);
+                      Set(varS01StartUnknown, true);
+                      Set(varS01Starting, false);
+                      Set(varS01FlowStatus, "開始結果を確認できません。再開始せず進捗一覧で確認してください")
+                    ),
+                    Set(varT001Saving, false);
+                    Set(varT001SaveUnknown, true);
+                    Set(varS01StartUnknown, true);
+                    Set(varS01Starting, false);
+                    Set(varS01FlowStatus, "開始状態の読戻しを確認できません。進捗一覧で確認してください")
+                  ),
+                  Set(varT001Saving, false);
+                  Set(varT001SaveUnknown, true);
+                  Set(varS01FlowStatus, "Excel添付またはログ添付の読戻しが一致しません。進捗一覧で確認してください");
+                  IfError(Patch('架空ログ証跡件', varT001ReadbackCase, {処理状態:"停止", 停止理由:"子行または添付の読戻し不一致"}), Blank());
+                  Navigate(Screen2, ScreenTransition.None)
+                )
+              )
+            Width: =If(Parent.Width < 720, Parent.Width - 50, Min(600, (Parent.Width - 66) / 2))
+            X: =If(Parent.Width < 720, 25, Max(25, (Parent.Width - (Self.Width * 2 + 16)) / 2))
+            Y: =Form1.Y + Form1.Height + 8
+          Children:
+            - cardS01OneExcelParent:
+                Control: TypedDataCard@1.0.7
+                Variant: ClassicComboBoxEdit
+                Properties:
+                  DataField: ="cr6cb_evidencecase"
+                  Default: =ThisItem.cr6cb_evidencecase
+                  DisplayName: ="親件"
+                  Height: =1
+                  Required: =true
+                  Update: =varT001ReadbackCase
+                  Visible: =false
+                  Width: =1
+                  X: =0
+                  Y: =0
+            - cardS01OneExcelRole:
+                Control: TypedDataCard@1.0.7
+                Variant: ClassicTextualEdit
+                Properties:
+                  DataField: ="cr6cb_filerole"
+                  Default: =ThisItem.cr6cb_filerole
+                  DisplayName: ="ファイル役割"
+                  Height: =1
+                  MaxLength: =255
+                  Required: =true
+                  Update: ="excel"
+                  Visible: =false
+                  Width: =1
+                  X: =0
+                  Y: =1
+            - cardS01OneExcelName:
+                Control: TypedDataCard@1.0.7
+                Variant: ClassicTextualEdit
+                Properties:
+                  DataField: ="cr6cb_filename"
+                  Default: =ThisItem.cr6cb_filename
+                  DisplayName: ="ファイル名"
+                  Height: =1
+                  MaxLength: =255
+                  Required: =true
+                  Update: =varT001SavingWorkbookName
+                  Visible: =false
+                  Width: =1
+                  X: =0
+                  Y: =2
+            - cardS01OneExcelAttachment:
+                Control: TypedDataCard@1.0.7
+                Variant: ClassicAttachmentsEdit
+                Properties:
+                  BorderColor: =RGBA(245, 245, 245, 1)
+                  DataField: ="{Attachments}"
+                  Default: =ThisItem.Attachments
+                  DisplayName: ="更新対象一覧（Excel）"
+                  Height: =146
+                  Required: =true
+                  Update: =attS01OneExcel.Attachments
+                  Width: =Parent.Width - 24
+                  X: =0
+                  Y: =3
+                Children:
+                  - lblS01OneExcelAttachment:
+                      Control: Label@2.5.1
+                      Properties:
+                        AutoHeight: =true
+                        Color: =RGBA(42, 57, 75, 1)
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =28
+                        Text: =Parent.DisplayName & If(CountRows(attS01OneExcel.Attachments) = 1, Char(10) & First(attS01OneExcel.Attachments).Name, "")
+                        Width: =Parent.Width - 12
+                        X: =6
+                  - attS01OneExcel:
+                      Control: Attachments@2.3.0
+                      MetadataKey: FieldValue
+                      Properties:
+                        AccessibleLabel: ="更新対象一覧 Excel 1冊"
+                        AddAttachmentText: ="Excelを添付"
+                        BorderStyle: =BorderStyle.None
+                        DisplayMode: =If(varT001Saving || Coalesce(varT001SaveUnknown, false) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, CountRows(Self.Attachments) > 0, DisplayMode.View, DisplayMode.Edit)
+                        Fill: =RGBA(255,255,255,0)
+                        Height: =If(CountRows(Self.Attachments) = 0, 112, 64)
+                        Items: =Parent.Default
+                        MaxAttachments: =1
+                        MaxAttachmentsText: =""
+                        NoAttachmentsText: =""
+                        Visible: =CountRows(Self.Attachments) = 0
+                        Width: =Min(480, Parent.Width - 12)
+                        X: =6
+                        Y: =-20
+                  - btnS01ExcelChange:
+                      Control: Button@0.0.45
+                      Properties:
+                        AccessibleLabel: ="変更"
+                        Appearance: ='ButtonCanvas.Appearance'.Secondary
+                        DisplayMode: =If(varT001Saving || Coalesce(varT001SaveUnknown, false) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, DisplayMode.Edit)
+                        Height: =36
+                        OnSelect: =If(!(varT001Saving || Coalesce(varT001SaveUnknown, false) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false)), Reset(attS01OneExcel))
+                        Text: ="変更"
+                        Visible: =CountRows(attS01OneExcel.Attachments) = 1
+                        Width: =90
+                        X: =6
+                        Y: =80
+                  - btnS01ExcelRemove:
+                      Control: Button@0.0.45
+                      Properties:
+                        AccessibleLabel: ="削除"
+                        Appearance: ='ButtonCanvas.Appearance'.Secondary
+                        DisplayMode: =If(varT001Saving || Coalesce(varT001SaveUnknown, false) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, DisplayMode.Edit)
+                        Height: =36
+                        OnSelect: =If(!(varT001Saving || Coalesce(varT001SaveUnknown, false) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false)), Reset(attS01OneExcel))
+                        Text: ="削除"
+                        Visible: =CountRows(attS01OneExcel.Attachments) = 1
+                        Width: =90
+                        X: =106
+                        Y: =80
+      - ScreenContainer1:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
+          Properties:
+            Fill: =RGBA(245, 245, 245, 1)
+            Height: =Parent.Height
+            LayoutAlignItems: =LayoutAlignItems.Stretch
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutGap: =16
+            PaddingBottom: =16
+            PaddingLeft: =16
+            PaddingRight: =16
+            PaddingTop: =16
+            Visible: =false
+            Width: =Parent.Width
+          Children:
+            - HeaderContainer1:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  Fill: =RGBA(255, 255, 255, 1)
+                  FillPortions: =0
+                  Height: =75
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutMinHeight: =16
+                  LayoutMinWidth: =16
+                  PaddingBottom: =8
+                  PaddingLeft: =8
+                  PaddingRight: =8
+                  PaddingTop: =8
+                  RadiusBottomLeft: =8
+                  RadiusBottomRight: =8
+                  RadiusTopLeft: =8
+                  RadiusTopRight: =8
+            - MainContainer1:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  Fill: =RGBA(255, 255, 255, 1)
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutMinHeight: =16
+                  LayoutMinWidth: =16
+                  PaddingBottom: =8
+                  PaddingLeft: =8
+                  PaddingRight: =8
+                  PaddingTop: =8
+                  RadiusBottomLeft: =8
+                  RadiusBottomRight: =8
+                  RadiusTopLeft: =8
+                  RadiusTopRight: =8
+            - FooterContainer1:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  Fill: =RGBA(255, 255, 255, 1)
+                  FillPortions: =0
+                  Height: =75
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutMinHeight: =16
+                  LayoutMinWidth: =16
+                  PaddingBottom: =8
+                  PaddingLeft: =8
+                  PaddingRight: =8
+                  PaddingTop: =8
+                  RadiusBottomLeft: =8
+                  RadiusBottomRight: =8
+                  RadiusTopLeft: =8
+                  RadiusTopRight: =8
+      - btnT001Save:
+          Control: Button@0.0.45
+          Properties:
+            AccessibleLabel: ="照合を開始"
+            DisplayMode: |-
+              =With(
+                {
+                  logCount:CountRows(attS01OneLog.Attachments),
+                  bookCount:CountRows(attS01OneExcel.Attachments),
+                  logFile:First(attS01OneLog.Attachments),
+                  bookFile:First(attS01OneExcel.Attachments)
+                },
+                If(varT001Saving || Coalesce(varT001SaveUnknown, false) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false) || !IsBlank(varT001Saved.架空ログ証跡件) || !Form1.Valid || logCount <> 1 || bookCount <> 1 || !EndsWith(Lower(logFile.Name), ".txt") || !EndsWith(Lower(bookFile.Name), ".xlsx") || IsBlank(DataCardValue2.Selected.Value) || IsBlank(DataCardValue3.Selected.Value), DisplayMode.Disabled, DisplayMode.Edit)
+              )
+            Height: =44
+            OnSelect: |-
+              =If(
+                  !varT001Saving &&
+                  !Coalesce(varT001SaveUnknown, false) &&
+                  IsBlank(varT001Saved.架空ログ証跡件) &&
+                  !Coalesce(varS01Starting, false) &&
+                  !Coalesce(varS01StartUnknown, false),
+                  With(
+                      {
+                          logCount: CountRows(attS01OneLog.Attachments),
+                          bookCount: CountRows(attS01OneExcel.Attachments),
+                          logFile: First(attS01OneLog.Attachments),
+                          bookFile: First(attS01OneExcel.Attachments)
+                      },
+                      If(
+                          logCount = 1 && bookCount = 1 &&
+                          EndsWith(Lower(logFile.Name), ".txt") &&
+                          EndsWith(Lower(bookFile.Name), ".xlsx") &&
+                          Form1.Valid &&
+                          !IsBlank(DataCardValue2.Selected.Value) &&
+                          !IsBlank(DataCardValue3.Selected.Value),
+                          Set(varT001Saving, true);
+                          Set(varT001SaveUnknown, false);
+                          Set(varS01StartUnknown, false);
+                          Set(varT001SavingLogName, logFile.Name);
+                          Set(varT001SavingWorkbookName, bookFile.Name);
+                          Set(varT001SavingEnvironment, DataCardValue2.Selected.Value);
+                          Set(varT001SavingServer, DataCardValue3.Selected.Value);
+                          SubmitForm(Form1),
+                          Notify("受付には.txtログ1件と.xlsx更新対象一覧1冊、環境、サーバーが必要です", NotificationType.Error)
+                      )
+                  ),
+                  Notify("保存中または保存済みの件があります。進捗一覧で確認してください", NotificationType.Warning)
+              )
+            Text: ="照合を開始"
+            Width: =170
+            X: =25
+            Y: =If(Parent.Width < 720, Parent.Height - 72, frmS01OneExcel.Y + frmS01OneExcel.Height + 16)
+      - lblT001MqMode:
+          Control: Label@2.5.1
+          Properties:
+            Color: =RGBA(42, 57, 75, 1)
+            Height: =If(IsBlank(Self.Text), 0, If(App.Width < 720, 52, 28))
+            Size: =12
+            Text: |-
+              =If(
+                  CountRows(attS01OneLog.Attachments) > 0 || CountRows(attS01OneExcel.Attachments) > 0,
+                  If(
+                      CountRows(attS01OneLog.Attachments) <> 1 || CountRows(attS01OneExcel.Attachments) <> 1,
+                      If(CountRows(attS01OneExcel.Attachments) = 0, "更新対象一覧（Excel）を追加してください。", "サーバーログ（txt）を追加してください。"),
+                      !EndsWith(Lower(First(attS01OneLog.Attachments).Name), ".txt") || !EndsWith(Lower(First(attS01OneExcel.Attachments).Name), ".xlsx"),
+                      "Excelは.xlsx、ログは.txtを添付してください。",
+                      !Form1.Valid,
+                      "未入力の必須項目があります。",
+                      ""
+                  ),
+                  ""
+              )
+            Width: =Parent.Width - 50
+            X: =25
+            Y: =52
+      - btnS01Progress:
+          Control: Button@0.0.45
+          Properties:
+            AccessibleLabel: ="進捗一覧へ"
+            Appearance: ='ButtonCanvas.Appearance'.Secondary
+            Height: =40
+            OnSelect: =Navigate(Screen2, ScreenTransition.None)
+            Text: ="進捗一覧へ"
+            Width: =150
+            X: =Parent.Width - 180
+            Y: =12
+      - btnS01StartFlow:
+          Control: Button@0.0.45
+          Properties:
+            AccessibleLabel: ="処理開始"
+            Appearance: ='ButtonCanvas.Appearance'.Primary
+            DisplayMode: =DisplayMode.Disabled
+            Height: =44
+            OnSelect: |-
+              =If(
+                !varT001Saving && !Coalesce(varT001SaveUnknown, false) && !Coalesce(varS01Starting, false) && !Coalesce(varS01StartUnknown, false) &&
+                !IsBlank(varT001Saved.架空ログ証跡件) && varT001Saved.処理状態 = "保存済み",
+                Set(varS01Starting, true);
+                Set(varS01FlowStatus, "処理を開始しています");
+                Set(varS01StartPatch, Blank());
+                IfError(
+                  Set(varS01StartPatch, Patch('架空ログ証跡件', varT001Saved, {処理状態:"開始受付済み", 開始操作日時:Now(), 停止理由:""})),
+                  Set(varS01StartPatch, Blank())
+                );
+                If(
+                  IsBlank(varS01StartPatch.架空ログ証跡件),
+                  Set(varS01StartUnknown, true);
+                  Set(varS01Starting, false);
+                  Set(varS01FlowStatus, "開始状況を確認してください。進捗一覧を開いて状態を確認します"),
+                  Set(varT001Saved, varS01StartPatch);
+                  IfError(
+                    '架空ログ証跡_件別Excel転記'.Run(Text(varT001Saved.架空ログ証跡件));
+                    Refresh('架空ログ証跡件');
+                    Set(varS01StartReadback, IfError(LookUp('架空ログ証跡件', 架空ログ証跡件 = varT001Saved.架空ログ証跡件), Blank()));
+                    If(
+                      !IsBlank(varS01StartReadback.架空ログ証跡件) &&
+                      (varS01StartReadback.処理状態 = "開始受付済み" || varS01StartReadback.処理状態 = "受付済み" || varS01StartReadback.処理状態 = "処理中" || varS01StartReadback.処理状態 = "停止" || varS01StartReadback.処理状態 = "結果不明" || varS01StartReadback.処理状態 = "転記済み"),
+                      Set(varT001Saved, varS01StartReadback);
+                      Set(varS01Starting, false);
+                      Set(varS01FlowStatus, "処理を開始しました");
+                      Navigate(Screen2, ScreenTransition.None),
+                      Set(varS01StartUnknown, true);
+                      Set(varS01Starting, false);
+                      Set(varS01FlowStatus, "開始結果を確認できません。進捗一覧で状態を確認してください")
+                    ),
+                    Set(varS01StartUnknown, true);
+                    Set(varS01Starting, false);
+                    Set(varS01FlowStatus, "開始結果を確認できません。進捗一覧で状態を確認してください")
+                  )
+                ),
+                Notify("保存済みの未開始件がありません", NotificationType.Warning)
+              )
+            Text: ="処理開始"
+            Visible: =false
+            Width: =170
+            X: =Parent.Width - 195
+            Y: =Parent.Height - 72
+      - lblS01FlowStatus:
+          Control: Label@2.5.1
+          Properties:
+            Color: =RGBA(120, 75, 0, 1)
+            Height: =60
+            Live: =Live.Polite
+            Size: =9
+            Text: |-
+              =If(
+                Coalesce(varS01StartUnknown, false) || Coalesce(varT001SaveUnknown, false),
+                Coalesce(varS01FlowStatus, "保存または開始の状態を確認してください"),
+                !IsBlank(varT001Saved.架空ログ証跡件),
+                "受付 " & Text(DateAdd(varT001Saved.作成日, TimeZoneOffset(varT001Saved.作成日) + 540, TimeUnit.Minutes), "[$-ja-JP]yyyy-mm-dd HH:mm") & " JST / 件ID " & Text(varT001Saved.架空ログ証跡件) & "。" & Coalesce(varS01FlowStatus, "2ファイルの保存内容を確認しています"),
+                Coalesce(varS01FlowStatus, "")
+              )
+            Width: =Parent.Width - 50
+            X: =25
+            Y: =If(Parent.Width < 720, Parent.Height - 136, btnT001Save.Y + btnT001Save.Height + 8)

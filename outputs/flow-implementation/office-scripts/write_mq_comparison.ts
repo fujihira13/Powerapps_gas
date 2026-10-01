@@ -1,4 +1,4 @@
-/** Write a separate MQ report sheet without modifying the 証跡 worksheet. */
+/** Create the single-sheet MQ result workbook from the copied legacy template. */
 type MqComparisonInput = {
   contract_version: string;
   status: string;
@@ -10,9 +10,11 @@ type MqComparisonInput = {
   log_only_ids: string[] | null;
   counts: { expected: number; logged: number; missing: number | null; log_only: number | null };
   presentation: { status_label: string; human_decision_required: boolean };
+  source_files: { batch_input: string; log: string };
 };
 type Cell = string | number | boolean;
 type WriterResult = { ok: boolean; caseId: string; resultText: string; error?: string };
+const TABLE_START_ROW_INDEX = 0;
 
 function parseInput(validationJson: string): MqComparisonInput | undefined {
   try {
@@ -31,7 +33,11 @@ function parseInput(validationJson: string): MqComparisonInput | undefined {
       typeof value.counts?.missing !== "number" ||
       typeof value.counts?.log_only !== "number" ||
       (value.presentation?.status_label !== "要確認" && value.presentation?.status_label !== "比較完了") ||
-      value.presentation?.human_decision_required !== true
+      value.presentation?.human_decision_required !== true ||
+      typeof value.source_files?.batch_input !== "string" ||
+      value.source_files.batch_input.length === 0 ||
+      typeof value.source_files?.log !== "string" ||
+      value.source_files.log.length === 0
     ) {
       return undefined;
     }
@@ -41,76 +47,36 @@ function parseInput(validationJson: string): MqComparisonInput | undefined {
   }
 }
 
-function rowResult(input: MqComparisonInput, mqId: string): string {
-  const isMissing = (input.missing_ids as string[]).indexOf(mqId) >= 0;
-  if (isMissing) {
-    return input.end_marker_present
-      ? "ログ未記録・要確認"
-      : "ログ未記録（ログ不完全）・要確認";
+function comparisonResult(input: MqComparisonInput, mqId: string): string {
+  const isExpected = input.expected_ids.indexOf(mqId) >= 0;
+  if (!isExpected) {
+    return "一覧にないID・要確認";
   }
-  return input.end_marker_present
-    ? "記録あり"
-    : "記録あり（ログ不完全・要確認）";
+  return input.logged_ids.indexOf(mqId) >= 0
+    ? "ログに記録あり"
+    : "ログに記録なし・要確認";
 }
 
 function resultText(input: MqComparisonInput): string {
   const lines: string[] = [
   ];
   for (const mqId of input.expected_ids) {
-    lines.push(`${mqId}\t${rowResult(input, mqId)}`);
+    lines.push(`${mqId}\t${comparisonResult(input, mqId)}`);
   }
   for (const mqId of input.log_only_ids as string[]) {
-    lines.push(`${mqId}\t予定外ID・要確認`);
+    lines.push(`${mqId}\t${comparisonResult(input, mqId)}`);
   }
   return lines.join("\n");
 }
 
-function expectedRows(input: MqComparisonInput, caseId: string): Cell[][] {
-  const headers = [
-    "RowType",
-    "CaseId",
-    "MQ_ID",
-    "Result",
-    "EndMarkerPresent",
-    "ExpectedCount",
-    "LoggedCount",
-    "MissingCount",
-    "LogOnlyCount",
-    "HumanDecisionRequired",
-  ];
-  const marker = input.end_marker_present ? "あり" : "なし";
-  const rows: Cell[][] = [
-    headers,
-    [
-      "summary",
-      caseId,
-      "",
-      input.presentation.status_label,
-      marker,
-      input.counts.expected,
-      input.counts.logged,
-      input.counts.missing as number,
-      input.counts.log_only as number,
-      true,
-    ],
-    [
-      "note",
-      caseId,
-      "",
-      "ALL SUCCESSはログ終端表示であり、MQ更新成功を証明しません。",
-      marker,
-      "",
-      "",
-      "",
-      "",
-      true,
-    ],
-  ];
+function expectedRows(input: MqComparisonInput): Cell[][] {
+  const rows: Cell[][] = [["MQ ID", "Excelの記載", "ログの記録", "照合結果"]];
   for (const mqId of input.expected_ids) {
-    rows.push(["planned", caseId, mqId, rowResult(input, mqId), marker, "", "", "", "", true]);
+    const inLog = input.logged_ids.indexOf(mqId) >= 0;
+    rows.push([mqId, "あり", inLog ? "あり" : "なし", inLog ? "一致" : "ログに記録なし"]);
   }
   for (const mqId of input.log_only_ids as string[]) {
-    rows.push(["log_only", caseId, mqId, "予定外ID・要確認", marker, "", "", "", "", true]);
+    rows.push([mqId, "なし", "あり", "Excelに記載なし"]);
   }
   return rows;
 }
@@ -121,20 +87,44 @@ function main(workbook: ExcelScript.Workbook, validationJson: string, caseId: st
   if (!input) {
     return fail("mq-id-result.v1 is invalid or comparison is unavailable");
   }
-  if (!workbook.getWorksheet("証跡")) {
-    return fail("証跡 worksheet is missing");
+  const worksheets = workbook.getWorksheets();
+  const evidenceSheet = workbook.getWorksheet("証跡");
+  if (
+    !evidenceSheet ||
+    worksheets.length !== 1 ||
+    worksheets[0].getName() !== "証跡"
+  ) {
+    return fail("expected a workbook with only the 証跡 worksheet");
   }
-  if (workbook.getWorksheet("MQ_Comparison")) {
-    return fail("MQ_Comparison already exists; refusing to overwrite");
+  if (workbook.getWorksheet("MQ ID照合結果")) {
+    return fail("MQ ID照合結果 already exists; refusing to overwrite");
   }
 
-  const sheet = workbook.addWorksheet("MQ_Comparison");
-  const rows = expectedRows(input, caseId);
-  const reportRange = sheet.getRangeByIndexes(0, 0, rows.length, rows[0].length);
+  const sheet = workbook.addWorksheet("MQ ID照合結果");
+  const rows = expectedRows(input);
+  const reportRange = sheet.getRangeByIndexes(TABLE_START_ROW_INDEX, 0, rows.length, rows[0].length);
   reportRange.setValues(rows);
   const table = sheet.addTable(reportRange, true);
   table.setName("MQ_ComparisonTable");
   table.getRange().getFormat().autofitColumns();
+  sheet.getRange("A:A").getFormat().setColumnWidth(185);
+  sheet.getRange("B:B").getFormat().setColumnWidth(180);
+  sheet.getRange("C:C").getFormat().setColumnWidth(190);
+  sheet.getRange("D:D").getFormat().setColumnWidth(230);
+  for (let index = 1; index < rows.length; index++) {
+    if (rows[index][3] !== "一致") {
+      sheet.getRangeByIndexes(TABLE_START_ROW_INDEX + index, 0, 1, 4)
+        .getFormat().getFill().setColor("#FFF2CC");
+    }
+  }
+  evidenceSheet.delete();
+  const remainingWorksheets = workbook.getWorksheets();
+  if (
+    remainingWorksheets.length !== 1 ||
+    remainingWorksheets[0].getName() !== "MQ ID照合結果"
+  ) {
+    return fail("result workbook does not contain exactly one MQ ID照合結果 worksheet");
+  }
 
   return JSON.stringify({ ok: true, caseId, resultText: resultText(input) } as WriterResult);
 }

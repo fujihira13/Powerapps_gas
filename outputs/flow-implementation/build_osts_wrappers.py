@@ -16,7 +16,7 @@ from tempfile import NamedTemporaryFile
 
 ROOT = Path(__file__).parent
 SOURCE_DIR = ROOT / "office-scripts"
-OUTPUT_DIR = ROOT.parent / "mq-cloud-20260927" / "osts-candidates-metadata-v2"
+OUTPUT_DIR = ROOT.parent / "mq-readability-20260929" / "osts"
 WRAPPER_VERSION = "0.2.0"
 SCRIPT_NAMES = (
     "read_validate_batch_input",

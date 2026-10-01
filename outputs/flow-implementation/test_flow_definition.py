@@ -88,9 +88,9 @@ class FlowDefinitionTests(unittest.TestCase):
         condition_name = "Condition_Readback_Matches_MQ"
         expression = json.dumps(find_action(actions, condition_name)["expression"])
         with self.subTest(condition=condition_name):
-            self.assertIn("Compose_LogFileName_MQ", expression)
-            self.assertIn("Compose_LogText_MQ", expression)
-            self.assertNotIn("Compose_LogFileName'", expression)
+            self.assertIn("Compose_MQ_Result_Readback_MQ", expression)
+            self.assertIn("Compose_MQ_Result_Write_MQ", expression)
+            self.assertNotIn("Read_back_evidence", expression)
             self.assertNotIn("Compose_LogText'", expression)
         self.assertEqual(validate_mq_candidate(candidate), [])
 
@@ -267,16 +267,20 @@ class FlowDefinitionTests(unittest.TestCase):
         scope = find_action(actions, "Scope_Write_And_Verify_MQ")
         self.assertEqual(scope["type"], "Scope")
         scope_actions = scope["actions"]
-        self.assertIn("Replace_template_row_MQ", scope_actions)
+        self.assertNotIn("Replace_template_row_MQ", scope_actions)
         self.assertIn("Run_MQ_Result_Write_MQ", scope_actions)
         self.assertIn("Run_MQ_Result_Readback_MQ", scope_actions)
-        self.assertIn("Read_back_evidence_MQ", scope_actions)
+        self.assertNotIn("Read_back_evidence_MQ", scope_actions)
         self.assertEqual(
             scope_actions["Run_MQ_Result_Write_MQ"]["runAfter"],
-            {"Replace_template_row_MQ": ["Succeeded"]},
+            {},
         )
         self.assertEqual(
             scope_actions["Run_MQ_Result_Readback_MQ"]["runAfter"],
+            {"Delay_before_readback_MQ": ["Succeeded"]},
+        )
+        self.assertEqual(
+            scope_actions["Delay_before_readback_MQ"]["runAfter"],
             {"Compose_MQ_Result_Write_Gate_MQ": ["Succeeded"]},
         )
         self.assertEqual(
@@ -337,7 +341,7 @@ class FlowDefinitionTests(unittest.TestCase):
         )
         self.assertEqual(
             result_readback["runAfter"],
-            {"Compose_MQ_Result_Write_Gate_MQ": ["Succeeded"]},
+            {"Delay_before_readback_MQ": ["Succeeded"]},
         )
 
         postcopy_unknown = find_action(actions, "Update_case_postcopy_unknown_MQ")
@@ -378,27 +382,20 @@ class FlowDefinitionTests(unittest.TestCase):
                 for error in validate_mq_candidate(candidate))
         )
 
-    def test_mq_readback_retry_is_flattened_without_losing_unknown_handlers(self):
+    def test_mq_report_readback_is_gated_without_evidence_writes(self):
         from build_flow_definition import build_mq_candidate, validate_mq_candidate
 
         candidate = build_mq_candidate()
         actions = candidate["properties"]["definition"]["actions"]
         scope = find_action(actions, "Scope_Write_And_Verify_MQ")
         scope_actions = scope["actions"]
-        self.assertNotIn("Condition_Readback_Is_Empty_MQ", scope_actions)
+        self.assertNotIn("Replace_template_row_MQ", scope_actions)
+        self.assertNotIn("Read_back_evidence_MQ", scope_actions)
+        self.assertNotIn("Read_back_evidence_retry_MQ", scope_actions)
         self.assertNotIn("Condition_Readback_Matches_MQ", scope_actions)
-        self.assertNotIn("Condition_Readback_Retry_Matches_MQ", scope_actions)
         self.assertEqual(
-            scope_actions["Read_back_evidence_MQ"]["runAfter"],
-            {"Delay_before_readback_MQ": ["Succeeded"]},
-        )
-        self.assertEqual(
-            scope_actions["Delay_before_readback_retry_MQ"]["runAfter"],
-            {"Read_back_evidence_MQ": ["Succeeded"]},
-        )
-        self.assertEqual(
-            scope_actions["Read_back_evidence_retry_MQ"]["runAfter"],
-            {"Delay_before_readback_retry_MQ": ["Succeeded"]},
+            scope_actions["Delay_before_readback_MQ"]["runAfter"],
+            {"Compose_MQ_Result_Write_Gate_MQ": ["Succeeded"]},
         )
         readback_gate = find_action(actions, "Condition_Readback_Matches_MQ")
         self.assertEqual(
@@ -406,17 +403,10 @@ class FlowDefinitionTests(unittest.TestCase):
             {"Scope_Write_And_Verify_MQ": ["Succeeded"]},
         )
         match_expression = readback_gate["expression"]["equals"][0]
-        self.assertIn(
-            "or(equals(length(body('Read_back_evidence_MQ')?['value']),0),and(",
-            match_expression,
-        )
-        self.assertIn(
-            "length(body('Read_back_evidence_retry_MQ')?['value']),1",
-            match_expression,
-        )
         self.assertIn("Compose_MQ_Result_Readback_MQ", match_expression)
-        self.assertIn("Compose_LogFileName_MQ", match_expression)
-        self.assertIn("Compose_LogText_MQ", match_expression)
+        self.assertIn("Compose_MQ_Result_Write_MQ", match_expression)
+        self.assertIn("['caseId']", match_expression)
+        self.assertIn("['resultText']", match_expression)
         self.assertIn("Update_case_success_MQ", readback_gate["actions"])
         self.assertIn(
             "Update_case_readback_unknown_MQ",
@@ -439,11 +429,7 @@ class FlowDefinitionTests(unittest.TestCase):
             if "Condition_Two_Attachments" in path
         ]
         self.assertLessEqual(max(len(path) - 1 for path in mq_paths), 8)
-        for target in (
-            "Delay_before_readback_retry_MQ",
-            "Read_back_evidence_retry_MQ",
-            "Condition_Readback_Matches_MQ",
-        ):
+        for target in ("Run_MQ_Result_Readback_MQ", "Condition_Readback_Matches_MQ"):
             path = next(path for path in mq_paths if path[-1] == target)
             with self.subTest(action=target):
                 expected_depth = 7 if target == "Condition_Readback_Matches_MQ" else 8
@@ -483,40 +469,37 @@ class FlowDefinitionTests(unittest.TestCase):
         self.assertEqual(diagnostic["inputs"]["retryPolicy"], {"type": "none"})
         self.assertEqual(validate_mq_candidate(build_mq_candidate()), [])
 
-    def test_mq_scripts_enforce_contract_and_preserve_result_workbook_evidence(self):
+    def test_mq_scripts_enforce_contract_and_create_a_single_result_worksheet(self):
         scripts = Path(__file__).parent / "office-scripts"
         reader = (scripts / "read_validate_batch_input.ts").read_text(encoding="utf-8")
         writer = (scripts / "write_mq_comparison.ts").read_text(encoding="utf-8")
         readback = (scripts / "readback_mq_comparison.ts").read_text(encoding="utf-8")
         for expected in ("Batch_Input", "MQ_ID", "MQ_BOX_ID=", "ALL SUCCESS", "MQ-[0-9]{4}"):
             self.assertIn(expected, reader)
-        self.assertIn("MQ_Comparison", writer)
-        self.assertIn("MQ_Comparison", readback)
+        self.assertIn("MQ ID照合結果", writer)
+        self.assertIn("MQ ID照合結果", readback)
         self.assertIn('workbook.getWorksheet("証跡")', writer)
-        self.assertIn('workbook.getWorksheet("証跡")', readback)
-        self.assertIn('workbook.getWorksheet("MQ_Comparison")', writer)
-        self.assertIn('workbook.getWorksheet("MQ_Comparison")', readback)
-        self.assertNotIn('getName() === "Evidence"', writer)
-        self.assertNotIn('getName() === "Evidence"', readback)
-        self.assertNotIn("worksheets.find(", readback)
-        self.assertNotIn("worksheets.some(", writer)
-        self.assertNotIn("worksheets.some(", readback)
-        self.assertNotIn("getTables().filter(", readback)
+        self.assertIn('evidenceSheet.delete()', writer)
+        self.assertIn('worksheets[0].getName() !== "MQ ID照合結果"', readback)
+        self.assertIn("worksheets.length !== 1", writer)
+        self.assertIn("worksheets.length !== 1", readback)
         self.assertIn('reportSheet.getTable("MQ_ComparisonTable")', readback)
-        self.assertIn("証跡 worksheet is missing", writer)
-        self.assertIn("証跡 or MQ_Comparison worksheet is missing", readback)
         self.assertIn('table.setName("MQ_ComparisonTable")', writer)
-        self.assertIn("`${mqId}\\t${rowResult(input, mqId)}`", writer)
-        self.assertIn("`${mqId}\\t${rowResult(input, mqId)}`", readback)
+        self.assertIn('["MQ ID", "Excelの記載", "ログの記録", "照合結果"]', writer)
+        self.assertIn('["MQ ID", "Excelの記載", "ログの記録", "照合結果"]', readback)
+        for result_label in (
+            "ログに記録あり",
+            "ログに記録なし・要確認",
+            "一覧にないID・要確認",
+        ):
+            self.assertIn(result_label, writer)
+            self.assertIn(result_label, readback)
+        self.assertIn("source_files", writer)
+        self.assertIn("source_files", readback)
         self.assertIn('value.status !== "comparison_ready"', writer)
         self.assertIn('value.status !== "comparison_ready"', readback)
-        self.assertIn("ALL SUCCESSはログ終端表示であり、MQ更新成功を証明しません。", writer)
-        self.assertIn("ALL SUCCESSはログ終端表示であり、MQ更新成功を証明しません。", readback)
-        self.assertIn("予定外ID・要確認", writer)
-        self.assertIn("予定外ID・要確認", readback)
-        for script in (writer, readback):
-            self.assertIn('"記録あり（ログ不完全・要確認）"', script)
-            self.assertIn('"ログ未記録（ログ不完全）・要確認"', script)
+        self.assertNotIn("function summaryRows", writer)
+        self.assertNotIn("function summaryRows", readback)
         self.assertIn('"記録あり"', reader)
         self.assertIn('"ログ未記録（ログ不完全）・要確認"', reader)
 
@@ -802,10 +785,6 @@ class FlowDefinitionTests(unittest.TestCase):
         self.assertIsNotNone(stop_action)
         reason = reason_action["inputs"]
         for message in (
-            "ログの冒頭に処理日行（処理日: YYYY-MM-DD）がありません。",
-            "ログの処理日がYYYY-MM-DD形式ではありません。",
-            "ログの処理日は暦上存在しない日付です。",
-            "本文日付（",
             "ログに環境の識別情報がありません。",
             "ログの環境が件の環境と一致しません。",
             "ログにサーバーの識別情報がありません。",
@@ -818,27 +797,16 @@ class FlowDefinitionTests(unittest.TestCase):
         self.assertNotIn("cr6cb_runnumber", reason)
         self.assertNotIn("Compose_LogLines')?[3]", reason)
 
-        # Guard every indexed/substring date check before evaluating it and
-        # make the same reason expression authoritative for acceptance.
+        # Keep size/name guards and the same authoritative rejection expression;
+        # optional legacy date headers must not reintroduce a date gate.
         self.assertLess(
             reason.index("greater(length(outputs('Compose_LogText')),30000)"),
             reason.index("empty(outputs('Compose_LogFileName'))"),
         )
-        self.assertLess(
-            reason.index("startsWith(string(coalesce(outputs('Compose_LogLines')?[0],'')),'処理日: ')") ,
-            reason.index("substring(string(coalesce(outputs('Compose_LogLines')?[0],'')),9,1)"),
-        )
-        self.assertIn("contains('0123456789'", reason)
-        self.assertIn("mod(int(substring(", reason)
-        self.assertIn("equals(mod(int(substring(", reason)
-        self.assertIn(",400),0)", reason)
-        self.assertIn(",100),0)", reason)
-        self.assertIn(",4),0)", reason)
-        self.assertIn("lessOrEquals(int(substring(", reason)
-        self.assertLess(
-            reason.index("ログの処理日は暦上存在しない日付です。"),
-            reason.index("本文日付（"),
-        )
+        self.assertNotIn("cr6cb_targetdate", reason)
+        self.assertNotIn("formatDateTime", reason)
+        self.assertNotIn("substring", reason)
+        self.assertIn("if(startsWith", reason)
         self.assertNotIn("1行上限", reason)
         self.assertEqual(
             reason_action["runAfter"], {"Compose_LogLines": ["Succeeded"]}
@@ -947,7 +915,7 @@ class FlowDefinitionTests(unittest.TestCase):
                 f"equals({row}['Environment'],outputs('Get_case')?['body/cr6cb_environment'])",
                 f"equals({row}['Server'],outputs('Get_case')?['body/cr6cb_server'])",
                 f"equals(formatDateTime({row}['ReceivedAtJst'],'yyyy-MM-dd HH:mm:ss'),convertTimeZone(outputs('Get_case')?['body/createdon'],'UTC','Tokyo Standard Time','yyyy-MM-dd HH:mm:ss'))",
-                f"startsWith(string({row}['TargetDate']),formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd'))",
+                f"equals(string(coalesce({row}['TargetDate'],'')),if(empty(outputs('Get_case')?['body/cr6cb_targetdate']),'',formatDateTime(outputs('Get_case')?['body/cr6cb_targetdate'],'yyyy-MM-dd')))",
                 f"equals(string({row}['ChunkIndex']),'1')",
                 f"equals(string({row}['ChunkCount']),'1')",
                 f"equals({row}['LogTextPart'],outputs('Compose_LogText'))",

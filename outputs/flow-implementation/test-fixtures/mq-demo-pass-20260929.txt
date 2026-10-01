@@ -1,0 +1,18 @@
+処理日: 2026-09-29
+環境: 架空環境A
+サーバー: 架空サーバーA
+INFO 09:00:00 MQ refresh batch started.
+INFO 09:00:01 Loading expected queue configuration.
+MQ_BOX_ID=MQ-0301
+INFO 09:00:02 Queue definition loaded.
+MQ_BOX_ID=MQ-0302
+WARN 09:00:03 Retry count was 0; no retry was needed.
+MQ_BOX_ID=MQ-0303
+INFO 09:00:04 MQ_BOX_STATUS=READY is not an ID.
+MQ_BOX_ID=MQ-0304
+INFO 09:00:05 Refresh continued on server A.
+MQ_BOX_ID=MQ-0305
+INFO 09:00:06 Reading the final queue group.
+MQ_BOX_ID=MQ-0306
+INFO 09:00:07 MQ refresh batch finished.
+ALL SUCCESS

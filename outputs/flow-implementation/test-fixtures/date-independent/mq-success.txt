@@ -1,0 +1,11 @@
+環境: 架空環境A
+サーバー: 架空サーバーA
+INFO MQ refresh started.
+MQ_BOX_ID=MQ-1001
+MQ_BOX_ID=MQ-1002
+MQ_BOX_ID=MQ-1003
+MQ_BOX_ID=MQ-1004
+MQ_BOX_ID=MQ-1005
+MQ_BOX_ID=MQ-1006
+INFO MQ refresh finished.
+ALL SUCCESS
