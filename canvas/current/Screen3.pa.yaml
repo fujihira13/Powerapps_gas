@@ -3,10 +3,10 @@ Screens:
     Properties:
       Fill: =RGBA(243, 246, 250, 1)
       LoadingSpinnerColor: =RGBA(0, 96, 160, 1)
-      OnVisible: =Refresh('件別ファイル'); Reset(clip01_radCaseCompare); Reset(clip01_radCaseJudgment); Reset(clip01_txtCaseComment); Set(varCaseEditsPending, false); Set(varCaseReturnNeedsSave, varEvidenceCase.レビュー状態 = "差し戻し"); Set(varCaseRequestBusy, false); Set(varCaseRequestError, ""); Set(varCaseRequestConfirm, false); Set(varCaseConfirmId, Blank()); Set(varCaseMissingPage, 1); Set(varCaseUnexpectedPage, 1); ClearCollect(colCaseMissingIds, Filter(Split(Coalesce(varEvidenceCase.MQ結果テキスト, ""), Char(10)), "ログ未記録" in Value || "ログに記録なし" in Value)); ClearCollect(colCaseUnexpectedIds, Filter(Split(Coalesce(varEvidenceCase.MQ結果テキスト, ""), Char(10)), "予定外ID" in Value || "一覧にない" in Value))
+      OnVisible: =Refresh('件別ファイル'); Reset(clip01_radCaseJudgment); Reset(clip01_txtCaseComment); Set(varCaseEditsPending, false); Set(varCaseReturnNeedsSave, varEvidenceCase.レビュー状態 = "差し戻し"); Set(varCaseRequestBusy, false); Set(varCaseRequestError, ""); Set(varCaseRequestConfirm, false); Set(varCaseConfirmId, Blank()); Set(varCaseMissingPage, 1); Set(varCaseUnexpectedPage, 1); ClearCollect(colCaseMissingIds, Filter(Split(Coalesce(varEvidenceCase.MQ結果テキスト, ""), Char(10)), "ログ未記録" in Value || "ログに記録なし" in Value)); ClearCollect(colCaseUnexpectedIds, Filter(Split(Coalesce(varEvidenceCase.MQ結果テキスト, ""), Char(10)), "予定外ID" in Value || "一覧にない" in Value)); Set(varDetailReviewBusy, false); Set(varDetailReviewError, ""); Reset(detailReviewDecision); Reset(detailReviewReason)
     Children:
       - clip01_VScroll:
-          Control: GroupContainer@1.5.0
+          Control: GroupContainer
           Variant: AutoLayout
           Properties:
             DropShadow: =DropShadow.None
@@ -16,19 +16,19 @@ Screens:
             Width: =Parent.Width
           Children:
             - clip01_Body:
-                Control: GroupContainer@1.5.0
+                Control: GroupContainer
                 Variant: ManualLayout
                 Properties:
                   AlignInContainer: =AlignInContainer.Start
                   DropShadow: =DropShadow.None
                   FillPortions: =0
-                  Height: =Max(Parent.Height, clip01_lblCaseRequestHelp.Y + clip01_lblCaseRequestHelp.Height + 24, If(clip01_lblCaseMissingHeading.Visible, clip01_galCaseMqResults.Y + clip01_galCaseMqResults.Height + 56, 0), If(clip01_lblCaseUnexpectedHeading.Visible, clip01_galCaseUnexpected.Y + clip01_galCaseUnexpected.Height + 56, 0), If(clip01_lblCaseFailure.Visible, clip01_lblCaseFailure.Y + clip01_lblCaseFailure.Height + 24, 0))
+                  Height: =Max(Parent.Height, clip01_lblCaseRequestHelp.Y + clip01_lblCaseRequestHelp.Height + 24, If(clip01_lblCaseMissingHeading.Visible, clip01_galCaseMqResults.Y + clip01_galCaseMqResults.Height + 56, 0), If(clip01_lblCaseUnexpectedHeading.Visible, clip01_galCaseUnexpected.Y + clip01_galCaseUnexpected.Height + 56, 0), If(clip01_lblCaseFailure.Visible, clip01_lblCaseFailure.Y + clip01_lblCaseFailure.Height + 24, 0), If(detailReviewRecord.Visible, detailReviewRecord.Y + detailReviewRecord.Height + 24, 0), If(detailReviewSavedResult.Visible, detailReviewSavedResult.Y + detailReviewSavedResult.Height + 24, 0), If(detailReviewSavedReason.Visible, detailReviewSavedReason.Y + detailReviewSavedReason.Height + 24, 0), If(detailReviewError.Visible, detailReviewError.Y + detailReviewError.Height + 24, 0))
                   LayoutMinHeight: =0
                   LayoutMinWidth: =0
                   Width: =Parent.Width - 16
                 Children:
                   - clip01_lblCaseTitle:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         Color: =RGBA(25, 54, 92, 1)
                         Font: =Font.'Segoe UI'
@@ -36,11 +36,11 @@ Screens:
                         Height: =52
                         Size: =If(Parent.Width < 640, 20, 28)
                         Text: ="ログと結果の確認"
-                        Width: =Parent.Width - 228
+                        Width: =Parent.Width - 48
                         X: =24
-                        Y: =18
+                        Y: =clip01_btnCaseBack.Y + clip01_btnCaseBack.Height + 8
                   - clip01_lblCaseIdentity:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         Color: =RGBA(42, 57, 75, 1)
                         Font: =Font.'Segoe UI'
@@ -64,11 +64,11 @@ Screens:
                           )
                         Tooltip: |-
                           ="照合番号: " & Text(varEvidenceCase.架空ログ証跡件)
-                        Width: =Parent.Width - 48
+                        Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
                         X: =24
-                        Y: =72
+                        Y: =clip01_lblCaseTitle.Y + clip01_lblCaseTitle.Height + 2
                   - clip01_lblCaseLogHeading:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         Color: =RGBA(25, 54, 92, 1)
                         Font: =Font.'Segoe UI'
@@ -80,7 +80,7 @@ Screens:
                         X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
                         Y: =If(Parent.Width >= 900, 72, Max(clip01_lblCaseExcelCheck.Y + clip01_lblCaseExcelCheck.Height, If(clip01_lblCaseMissingHeading.Visible, clip01_galCaseMqResults.Y + clip01_galCaseMqResults.Height + If(CountRows(colCaseMissingIds) > 10, 44, 0), 0), If(clip01_lblCaseUnexpectedHeading.Visible, clip01_galCaseUnexpected.Y + clip01_galCaseUnexpected.Height + If(CountRows(colCaseUnexpectedIds) > 10, 44, 0), 0), If(clip01_lblCaseFailure.Visible, clip01_lblCaseFailure.Y + clip01_lblCaseFailure.Height, 0)) + 16)
                   - clip01_frmCaseSourceLog:
-                      Control: Form@2.4.4
+                      Control: Form
                       Variant: Classic
                       Layout: Vertical
                       Properties:
@@ -95,7 +95,7 @@ Screens:
                         Y: =clip01_lblCaseLogHeading.Y + 34
                       Children:
                         - clip01_attCaseSourceLog_DataCard:
-                            Control: TypedDataCard@1.0.7
+                            Control: TypedDataCard
                             Variant: ClassicAttachmentsEdit
                             IsLocked: true
                             Properties:
@@ -111,7 +111,7 @@ Screens:
                               Y: =0
                             Children:
                               - clip01_attCaseSourceLog:
-                                  Control: Attachments@2.3.0
+                                  Control: Attachments
                                   MetadataKey: FieldValue
                                   Properties:
                                     AccessibleLabel: ="元ログ"
@@ -124,7 +124,7 @@ Screens:
                                     Width: =Parent.Width - 12
                                     X: =6
                   - clip01_s03OneLogHeading:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         Color: =RGBA(25, 54, 92, 1)
                         Font: =Font.'Segoe UI'
@@ -136,7 +136,7 @@ Screens:
                         X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
                         Y: =clip01_lblCaseLogHeading.Y + 34
                   - clip01_s03OneLogForm:
-                      Control: Form@2.4.4
+                      Control: Form
                       Variant: Classic
                       Layout: Vertical
                       Properties:
@@ -151,7 +151,7 @@ Screens:
                         Y: =clip01_lblCaseLogHeading.Y + 60
                       Children:
                         - clip01_s03OneLogAttachmentCard:
-                            Control: TypedDataCard@1.0.7
+                            Control: TypedDataCard
                             Variant: ClassicAttachmentsEdit
                             IsLocked: true
                             Properties:
@@ -166,7 +166,7 @@ Screens:
                               Y: =0
                             Children:
                               - clip01_s03OneLogAttachment:
-                                  Control: Attachments@2.3.0
+                                  Control: Attachments
                                   MetadataKey: FieldValue
                                   Properties:
                                     AccessibleLabel: ="サーバーログ（txt）"
@@ -179,7 +179,7 @@ Screens:
                                     Width: =Parent.Width - 12
                                     X: =6
                   - clip01_s03OneExcelHeading:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         Color: =RGBA(25, 54, 92, 1)
                         Font: =Font.'Segoe UI'
@@ -191,7 +191,7 @@ Screens:
                         X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
                         Y: =clip01_s03OneLogForm.Y + clip01_s03OneLogForm.Height + 8
                   - clip01_s03OneExcelForm:
-                      Control: Form@2.4.4
+                      Control: Form
                       Variant: Classic
                       Layout: Vertical
                       Properties:
@@ -206,7 +206,7 @@ Screens:
                         Y: =clip01_s03OneExcelHeading.Y + 26
                       Children:
                         - clip01_s03OneExcelAttachmentCard:
-                            Control: TypedDataCard@1.0.7
+                            Control: TypedDataCard
                             Variant: ClassicAttachmentsEdit
                             IsLocked: true
                             Properties:
@@ -221,7 +221,7 @@ Screens:
                               Y: =0
                             Children:
                               - clip01_s03OneExcelAttachment:
-                                  Control: Attachments@2.3.0
+                                  Control: Attachments
                                   MetadataKey: FieldValue
                                   Properties:
                                     AccessibleLabel: ="更新対象一覧（Excel）"
@@ -234,7 +234,7 @@ Screens:
                                     Width: =Parent.Width - 12
                                     X: =6
                   - clip01_lnkCaseEvidenceExcel:
-                      Control: ModernLink@1.0.1
+                      Control: ModernLink
                       Properties:
                         AccessibleLabel: ="照合結果をExcelで開く"
                         DisplayMode: |-
@@ -256,14 +256,14 @@ Screens:
                         X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
                         Y: =clip01_s03OneExcelForm.Y + clip01_s03OneExcelForm.Height + 4
                   - clip01_lblCaseExcelCheck:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         Color: =RGBA(42, 57, 75, 1)
                         Font: =Font.'Segoe UI'
                         Height: =66
                         Size: =14
                         Text: |-
-                          =If(
+                          =If(varEvidenceCase.処理状態 = "停止" || varEvidenceCase.処理状態 = "結果不明", "照合できません", If(
                             IsBlank(varEvidenceCase.バッチExcelファイル名),
                             "過去のログ記録",
                             With(
@@ -280,12 +280,12 @@ Screens:
                               "ExcelのID: " & If(IsBlank(varEvidenceCase.MQ予定件数), "未確定", Text(varEvidenceCase.MQ予定件数, "0") & "件") &
                               " / ログのID: " & If(IsBlank(varEvidenceCase.MQ記録件数), "未確定", Text(varEvidenceCase.MQ記録件数, "0") & "件")
                             )
-                          )
+                          ))
                         Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
                         X: =24
-                        Y: =150
+                        Y: =clip01_lblCaseIdentity.Y + clip01_lblCaseIdentity.Height + 6
                   - clip01_lblCaseMissingHeading:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         Color: =RGBA(25, 54, 92, 1)
                         Font: =Font.'Segoe UI'
@@ -298,7 +298,7 @@ Screens:
                         X: =24
                         Y: =clip01_lblCaseExcelCheck.Y + clip01_lblCaseExcelCheck.Height + 8
                   - clip01_galCaseMqResults:
-                      Control: Gallery@2.15.0
+                      Control: Gallery
                       Variant: Vertical
                       Properties:
                         AccessibleLabel: ="ログに記録されていないID"
@@ -313,7 +313,7 @@ Screens:
                         Y: =clip01_lblCaseMissingHeading.Y + clip01_lblCaseMissingHeading.Height + 2
                       Children:
                         - clip01_lblCaseMqResultRow:
-                            Control: Label@2.5.1
+                            Control: Label
                             Properties:
                               Color: =RGBA(42, 57, 75, 1)
                               Font: =Font.'Segoe UI'
@@ -323,7 +323,7 @@ Screens:
                               Width: =Parent.TemplateWidth - 8
                               X: =4
                   - clip01_lblCaseUnexpectedHeading:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         Color: =RGBA(25, 54, 92, 1)
                         Font: =Font.'Segoe UI'
@@ -336,7 +336,7 @@ Screens:
                         X: =24
                         Y: =If(clip01_lblCaseMissingHeading.Visible, clip01_galCaseMqResults.Y + clip01_galCaseMqResults.Height + If(CountRows(colCaseMissingIds) > 10, 50, 8), clip01_lblCaseMissingHeading.Y)
                   - clip01_galCaseUnexpected:
-                      Control: Gallery@2.15.0
+                      Control: Gallery
                       Variant: Vertical
                       Properties:
                         AccessibleLabel: ="一覧にないID"
@@ -351,7 +351,7 @@ Screens:
                         Y: =clip01_lblCaseUnexpectedHeading.Y + clip01_lblCaseUnexpectedHeading.Height + 2
                       Children:
                         - clip01_lblCaseUnexpectedRow:
-                            Control: Label@2.5.1
+                            Control: Label
                             Properties:
                               Color: =RGBA(42, 57, 75, 1)
                               Font: =Font.'Segoe UI'
@@ -361,7 +361,7 @@ Screens:
                               Width: =Parent.TemplateWidth - 8
                               X: =4
                   - clip01_lblCaseFailure:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         AutoHeight: =true
                         Color: =RGBA(163, 38, 45, 1)
@@ -373,70 +373,45 @@ Screens:
                         X: =24
                         Y: =If(clip01_lblCaseUnexpectedHeading.Visible, clip01_galCaseUnexpected.Y + clip01_galCaseUnexpected.Height + If(CountRows(colCaseUnexpectedIds) > 10, 50, 8), clip01_lblCaseMissingHeading.Visible, clip01_galCaseMqResults.Y + clip01_galCaseMqResults.Height + If(CountRows(colCaseMissingIds) > 10, 50, 8), clip01_lblCaseMissingHeading.Y)
                   - clip01_lblCaseReviewStatus:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         Color: =RGBA(42, 57, 75, 1)
                         Font: =Font.'Segoe UI'
                         Height: =28
-                        Text: |-
-                          ="レビュー: " & If(IsBlank(varEvidenceCase.レビュー状態) || varEvidenceCase.レビュー状態 = "未依頼", "依頼前", varEvidenceCase.レビュー状態)
+                        Text: =Switch(varEvidenceCase.レビュー状態, "依頼中", "レビュー待ち", "再依頼", "レビュー待ち", "確認済み", "レビュー完了", "差し戻し", "差し戻し", Coalesce(varEvidenceCase.レビュー状態, ""))
+                        Visible: =!IsBlank(varEvidenceCase.レビュー状態) && varEvidenceCase.レビュー状態 <> "未依頼"
                         Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
                         X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
-                        Y: =clip01_btnCaseRequestReview.Y + clip01_btnCaseRequestReview.Height + 4
-                  - clip01_lblCaseCompareHeading:
-                      Control: Label@2.5.1
+                        Y: =If(clip01_btnCaseRequestReview.Visible, clip01_lblCaseRequestHelp.Y + clip01_lblCaseRequestHelp.Height + 12, If(clip01_txtCaseComment.Visible, clip01_txtCaseComment.Y + clip01_txtCaseComment.Height + 12, detailAssigneeComment.Y + detailAssigneeComment.Height + 12))
+                  - clip01_lblCaseJudgmentHeading:
+                      Control: Label
                       Properties:
                         Color: =RGBA(25, 54, 92, 1)
                         Font: =Font.'Segoe UI'
                         FontWeight: =FontWeight.Semibold
                         Height: =26
                         Size: =16
-                        Text: ="担当者の確認"
+                        Text: ="担当者の判断"
                         Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
                         X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
                         Y: =If(clip01_lnkCaseEvidenceExcel_1.Visible, clip01_lnkCaseEvidenceExcel_1.Y + clip01_lnkCaseEvidenceExcel_1.Height + 8, clip01_lnkCaseEvidenceExcel.Y + clip01_lnkCaseEvidenceExcel.Height + 8)
-                  - clip01_radCaseCompare:
-                      Control: ModernRadio@1.0.2
-                      Properties:
-                        AccessibleLabel: ="担当者の確認"
-                        Default: |-
-                          =If(varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && !IsBlank(varEvidenceCase.転記照合), {Value: varEvidenceCase.転記照合}, Blank())
-                        DisplayMode: =If(varCaseRequestConfirm || varCaseRequestBusy, DisplayMode.Disabled, If(varDemoRole = "担当者役" && CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 && varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && varEvidenceCase.レビュー状態 <> "依頼中" && varEvidenceCase.レビュー状態 <> "再依頼" && varEvidenceCase.レビュー状態 <> "確認済み", DisplayMode.Edit, DisplayMode.Disabled))
-                        Height: =32
-                        Items: =["一致", "不一致", "確認保留"]
-                        Layout: =OptionLayout.Horizontal
-                        OnChange: =Set(varCaseEditsPending, true)
-                        Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
-                        X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
-                        Y: =clip01_lblCaseCompareHeading.Y + 26
-                  - clip01_lblCaseJudgmentHeading:
-                      Control: Label@2.5.1
-                      Properties:
-                        Color: =RGBA(25, 54, 92, 1)
-                        Font: =Font.'Segoe UI'
-                        FontWeight: =FontWeight.Semibold
-                        Height: =26
-                        Size: =16
-                        Text: ="処理結果の判断"
-                        Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
-                        X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
-                        Y: =clip01_radCaseCompare.Y + clip01_radCaseCompare.Height + 4
                   - clip01_radCaseJudgment:
-                      Control: ModernRadio@1.0.2
+                      Control: ModernRadio
                       Properties:
-                        AccessibleLabel: ="処理結果の判断"
+                        AccessibleLabel: ="担当者の判断"
                         Default: |-
-                          =If(varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && !IsBlank(varEvidenceCase.処理結果判断), {Value: varEvidenceCase.処理結果判断}, Blank())
-                        DisplayMode: =If(varCaseRequestConfirm || varCaseRequestBusy, DisplayMode.Disabled, If(varDemoRole = "担当者役" && CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 && varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && varEvidenceCase.レビュー状態 <> "依頼中" && varEvidenceCase.レビュー状態 <> "再依頼" && varEvidenceCase.レビュー状態 <> "確認済み", DisplayMode.Edit, DisplayMode.Disabled))
+                          =If(varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && !IsBlank(varEvidenceCase.処理結果判断), {Value: Switch(varEvidenceCase.処理結果判断, "正常", "問題なし", "異常", "要対応", "判断保留", "判断保留", Coalesce(varEvidenceCase.処理結果判断, "未記録"))}, Blank())
+                        DisplayMode: =If(varCaseRequestConfirm || varCaseRequestBusy || varDetailReviewBusy, DisplayMode.Disabled, If(CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 && varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && varEvidenceCase.レビュー状態 <> "依頼中" && varEvidenceCase.レビュー状態 <> "再依頼" && varEvidenceCase.レビュー状態 <> "確認済み", DisplayMode.Edit, DisplayMode.Disabled))
                         Height: =32
-                        Items: =["正常", "異常", "判断保留"]
+                        Items: =["問題なし", "要対応", "判断保留"]
                         Layout: =OptionLayout.Horizontal
                         OnChange: =Set(varCaseEditsPending, true)
+                        Visible: =IsBlank(varEvidenceCase.レビュー状態) || varEvidenceCase.レビュー状態 = "未依頼" || varEvidenceCase.レビュー状態 = "差し戻し"
                         Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
                         X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
                         Y: =clip01_lblCaseJudgmentHeading.Y + 26
                   - clip01_lblCaseCommentHeading:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         Color: =RGBA(25, 54, 92, 1)
                         Font: =Font.'Segoe UI'
@@ -446,39 +421,38 @@ Screens:
                         Text: ="コメント"
                         Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
                         X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
-                        Y: =clip01_radCaseJudgment.Y + clip01_radCaseJudgment.Height + 4
+                        Y: =If(clip01_radCaseJudgment.Visible, clip01_radCaseJudgment.Y + clip01_radCaseJudgment.Height + 4, detailAssigneeValue.Y + detailAssigneeValue.Height + 8)
                   - clip01_txtCaseComment:
-                      Control: ModernTextInput@1.1.2
+                      Control: ModernTextInput
                       Properties:
                         AccessibleLabel: ="コメント"
                         Default: =If(varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致", Coalesce(varEvidenceCase.担当者コメント, ""), "")
-                        DisplayMode: =If(varCaseRequestConfirm || varCaseRequestBusy, DisplayMode.Disabled, If(varDemoRole = "担当者役" && CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 && varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && varEvidenceCase.レビュー状態 <> "依頼中" && varEvidenceCase.レビュー状態 <> "再依頼" && varEvidenceCase.レビュー状態 <> "確認済み", DisplayMode.Edit, DisplayMode.Disabled))
+                        DisplayMode: =If(varCaseRequestConfirm || varCaseRequestBusy || varDetailReviewBusy, DisplayMode.Disabled, If(CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 && varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && varEvidenceCase.レビュー状態 <> "依頼中" && varEvidenceCase.レビュー状態 <> "再依頼" && varEvidenceCase.レビュー状態 <> "確認済み", DisplayMode.Edit, DisplayMode.Disabled))
                         Height: =48
                         OnChange: =Set(varCaseEditsPending, true)
-                        Required: =clip01_radCaseJudgment.Selected.Value = "異常" || clip01_radCaseJudgment.Selected.Value = "判断保留"
+                        Required: =clip01_radCaseJudgment.Selected.Value = "要対応" || clip01_radCaseJudgment.Selected.Value = "判断保留"
                         Type: =TextInputType.Multiline
+                        Visible: =IsBlank(varEvidenceCase.レビュー状態) || varEvidenceCase.レビュー状態 = "未依頼" || varEvidenceCase.レビュー状態 = "差し戻し"
                         Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
                         X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
                         Y: =clip01_lblCaseCommentHeading.Y + 26
                   - clip01_btnCaseRecord:
-                      Control: Button@0.0.45
+                      Control: Button
                       Properties:
                         AccessibleLabel: ="下書き保存"
                         Appearance: ='ButtonCanvas.Appearance'.Secondary
-                        DisplayMode: =If(varCaseRequestConfirm || varCaseRequestBusy, DisplayMode.Disabled, If(varDemoRole = "担当者役" && CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 && varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && varEvidenceCase.レビュー状態 <> "依頼中" && varEvidenceCase.レビュー状態 <> "再依頼" && varEvidenceCase.レビュー状態 <> "確認済み" && !IsBlank(clip01_radCaseCompare.Selected.Value) && !IsBlank(clip01_radCaseJudgment.Selected.Value) && (clip01_radCaseJudgment.Selected.Value = "正常" || !IsBlank(Trim(clip01_txtCaseComment.Text))), DisplayMode.Edit, DisplayMode.Disabled))
+                        DisplayMode: =If(varCaseRequestConfirm || varCaseRequestBusy || varDetailReviewBusy, DisplayMode.Disabled, If(CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 && varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && varEvidenceCase.レビュー状態 <> "依頼中" && varEvidenceCase.レビュー状態 <> "再依頼" && varEvidenceCase.レビュー状態 <> "確認済み" && !IsBlank(clip01_radCaseJudgment.Selected.Value) && (clip01_radCaseJudgment.Selected.Value = "問題なし" || !IsBlank(Trim(clip01_txtCaseComment.Text))), DisplayMode.Edit, DisplayMode.Disabled))
                         Height: =42
                         OnSelect: |-
                           =If(
-                            varDemoRole = "担当者役" &&
                             CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 &&
                             varEvidenceCase.処理状態 = "転記済み" &&
                             varEvidenceCase.Excel反映確認 = "全文一致" &&
                             varEvidenceCase.レビュー状態 <> "依頼中" &&
                             varEvidenceCase.レビュー状態 <> "再依頼" &&
                             varEvidenceCase.レビュー状態 <> "確認済み" &&
-                            !IsBlank(clip01_radCaseCompare.Selected.Value) &&
                             !IsBlank(clip01_radCaseJudgment.Selected.Value) &&
-                            (clip01_radCaseJudgment.Selected.Value = "正常" || !IsBlank(Trim(clip01_txtCaseComment.Text))),
+                            (clip01_radCaseJudgment.Selected.Value = "問題なし" || !IsBlank(Trim(clip01_txtCaseComment.Text))),
                             With(
                               {
                                 savedCase: IfError(
@@ -486,8 +460,7 @@ Screens:
                                     '架空ログ証跡件',
                                     varEvidenceCase,
                                     {
-                                      転記照合: clip01_radCaseCompare.Selected.Value,
-                                      処理結果判断: clip01_radCaseJudgment.Selected.Value,
+                                      処理結果判断: Switch(clip01_radCaseJudgment.Selected.Value, "問題なし", "正常", "要対応", "異常", "判断保留", "判断保留", Blank()),
                                       担当者コメント: clip01_txtCaseComment.Text
                                     }
                                   ),
@@ -503,58 +476,49 @@ Screens:
                             )
                           )
                         Text: ="下書き保存"
+                        Visible: =(IsBlank(varEvidenceCase.レビュー状態) || varEvidenceCase.レビュー状態 = "未依頼" || varEvidenceCase.レビュー状態 = "差し戻し")
                         Width: =150
                         X: =If(Parent.Width >= 900, Parent.Width / 2 + 188, 200)
                         Y: =clip01_txtCaseComment.Y + clip01_txtCaseComment.Height + 12
                   - clip01_btnCaseRequestReview:
-                      Control: Button@0.0.45
+                      Control: Button
                       Properties:
                         AccessibleLabel: =If(varEvidenceCase.レビュー状態 = "差し戻し", "再依頼", "レビューを依頼")
                         Appearance: ='ButtonCanvas.Appearance'.Primary
-                        DisplayMode: =If(varCaseRequestConfirm || varCaseRequestBusy, DisplayMode.Disabled, If(!varCaseRequestBusy && IsBlank(varCaseRequestError) && varDemoRole = "担当者役" && CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 && varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && !IsBlank(clip01_radCaseCompare.Selected.Value) && !IsBlank(clip01_radCaseJudgment.Selected.Value) && (clip01_radCaseJudgment.Selected.Value = "正常" || !IsBlank(Trim(clip01_txtCaseComment.Text))) && (IsBlank(varEvidenceCase.レビュー状態) || varEvidenceCase.レビュー状態 = "未依頼" || varEvidenceCase.レビュー状態 = "差し戻し"), DisplayMode.Edit, DisplayMode.Disabled))
+                        DisplayMode: =If(varCaseRequestConfirm || varCaseRequestBusy || varDetailReviewBusy, DisplayMode.Disabled, If(!varCaseRequestBusy && IsBlank(varCaseRequestError) && CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 && varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && !IsBlank(clip01_radCaseJudgment.Selected.Value) && (clip01_radCaseJudgment.Selected.Value = "問題なし" || !IsBlank(Trim(clip01_txtCaseComment.Text))) && (IsBlank(varEvidenceCase.レビュー状態) || varEvidenceCase.レビュー状態 = "未依頼" || varEvidenceCase.レビュー状態 = "差し戻し"), DisplayMode.Edit, DisplayMode.Disabled))
                         Height: =42
                         OnSelect: |-
                           =If(
                           !varCaseRequestBusy &&
                             IsBlank(varCaseRequestError) &&
-                            varDemoRole = "担当者役" &&
                             CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 &&
                             varEvidenceCase.処理状態 = "転記済み" &&
                             varEvidenceCase.Excel反映確認 = "全文一致" &&
-                            !IsBlank(clip01_radCaseCompare.Selected.Value) &&
                             !IsBlank(clip01_radCaseJudgment.Selected.Value) &&
-                            (clip01_radCaseJudgment.Selected.Value = "正常" || !IsBlank(Trim(clip01_txtCaseComment.Text))) &&
+                            (clip01_radCaseJudgment.Selected.Value = "問題なし" || !IsBlank(Trim(clip01_txtCaseComment.Text))) &&
                             (IsBlank(varEvidenceCase.レビュー状態) || varEvidenceCase.レビュー状態 = "未依頼" || varEvidenceCase.レビュー状態 = "差し戻し"),
                             Set(varCaseConfirmId, varEvidenceCase.架空ログ証跡件);
                             Set(varCaseRequestConfirm, true)
                           )
                         Text: =If(varEvidenceCase.レビュー状態 = "差し戻し", "再依頼", "レビューを依頼")
+                        Visible: =(IsBlank(varEvidenceCase.レビュー状態) || varEvidenceCase.レビュー状態 = "未依頼" || varEvidenceCase.レビュー状態 = "差し戻し")
                         Width: =160
                         X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
                         Y: =clip01_txtCaseComment.Y + clip01_txtCaseComment.Height + 12
                   - clip01_lblCaseRequestHelp:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         AutoHeight: =true
                         Color: =RGBA(42, 57, 75, 1)
                         Font: =Font.'Segoe UI'
                         Size: =12
-                        Text: |-
-                          =If(
-                            !IsBlank(varCaseRequestError), varCaseRequestError,
-                            varDemoRole <> "担当者役", "担当者役で確認してください。",
-                            CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) <> 2, "",
-                            varEvidenceCase.処理状態 <> "転記済み" || varEvidenceCase.Excel反映確認 <> "全文一致", "処理と結果Excelの確認が終わると依頼できます。",
-                            IsBlank(clip01_radCaseCompare.Selected.Value) || IsBlank(clip01_radCaseJudgment.Selected.Value), "",
-                            clip01_radCaseJudgment.Selected.Value <> "正常" && IsBlank(Trim(clip01_txtCaseComment.Text)), "異常・判断保留の場合はコメントを入力してください。",
-                            varEvidenceCase.レビュー状態 = "依頼中" || varEvidenceCase.レビュー状態 = "再依頼" || varEvidenceCase.レビュー状態 = "確認済み", "この件はレビュー依頼済みです。",
-                            ""
-                          )
+                        Text: "=If(\n  !IsBlank(varCaseRequestError), varCaseRequestError,\n  \n  CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) <> 2, \"\",\n  varEvidenceCase.処理状態 <> \"転記済み\" || varEvidenceCase.Excel反映確認 <> \"全文一致\", \"処理と結果Excelの確認が終わると依頼できます。\",\n  IsBlank(clip01_radCaseJudgment.Selected.Value), \"\",\n  clip01_radCaseJudgment.Selected.Value <> \"問題なし\" && IsBlank(Trim(clip01_txtCaseComment.Text)), \"要対応・判断保留の場合はコメントを入力してください。\",\n  varEvidenceCase.レビュー状態 = \"依頼中\" || varEvidenceCase.レビュー状態 = \"再依頼\" || varEvidenceCase.レビュー状態 = \"確認済み\", \"\",\n  \"\"\n)"
+                        Visible: =varEvidenceCase.処理状態 <> "停止" && varEvidenceCase.処理状態 <> "結果不明" && ((IsBlank(varEvidenceCase.レビュー状態) || varEvidenceCase.レビュー状態 = "未依頼" || varEvidenceCase.レビュー状態 = "差し戻し"))
                         Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
                         X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
-                        Y: =clip01_lblCaseReviewStatus.Y + clip01_lblCaseReviewStatus.Height + 2
+                        Y: =clip01_btnCaseRequestReview.Y + clip01_btnCaseRequestReview.Height + 4
                   - clip01_btnCaseRetry:
-                      Control: Button@0.0.45
+                      Control: Button
                       Properties:
                         AccessibleLabel: ="この件を再実行"
                         Appearance: ='ButtonCanvas.Appearance'.Secondary
@@ -566,19 +530,19 @@ Screens:
                         X: =366
                         Y: =If(Parent.Width >= 900, 670, 686)
                   - clip01_btnCaseBack:
-                      Control: Button@0.0.45
+                      Control: Button
                       Properties:
-                        AccessibleLabel: ="進捗一覧へ戻る"
+                        AccessibleLabel: ="進捗一覧に戻る"
                         Appearance: ='ButtonCanvas.Appearance'.Secondary
-                        DisplayMode: =If(varCaseRequestConfirm || varCaseRequestBusy, DisplayMode.Disabled, DisplayMode.Edit)
-                        Height: =42
+                        DisplayMode: =If(varCaseRequestConfirm || varCaseRequestBusy || varDetailReviewBusy, DisplayMode.Disabled, DisplayMode.Edit)
+                        Height: =36
                         OnSelect: =Navigate(Screen2, ScreenTransition.None)
-                        Text: ="進捗一覧へ戻る"
-                        Width: =168
-                        X: =Parent.Width - 192
-                        Y: =22
+                        Text: ="進捗一覧に戻る"
+                        Width: =Min(192, Parent.Width - 48)
+                        X: =24
+                        Y: =18
                   - clip01_lnkCaseEvidenceExcel_1:
-                      Control: ModernLink@1.0.1
+                      Control: ModernLink
                       Properties:
                         AccessibleLabel: ="照合に使ったExcel・ログと結果を開く"
                         DisplayMode: |-
@@ -601,90 +565,258 @@ Screens:
                         X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
                         Y: =clip01_lnkCaseEvidenceExcel.Y + 36
                   - clip01_btnCaseMissingPrev:
-                      Control: Button@0.0.45
+                      Control: Button
                       Properties:
-                        AccessibleLabel: ="前へ"
+                        AccessibleLabel: ="前の10件"
                         Appearance: ='ButtonCanvas.Appearance'.Secondary
                         DisplayMode: =If(!varCaseRequestConfirm && varCaseMissingPage > 1, DisplayMode.Edit, DisplayMode.Disabled)
                         Height: =36
                         OnSelect: =Set(varCaseMissingPage, Max(1, varCaseMissingPage - 1))
-                        Text: ="前へ"
+                        Text: ="前の10件"
                         Visible: =CountRows(colCaseMissingIds) > 10
-                        Width: =70
-                        X: =24
+                        Width: =100
+                        X: =clip01_galCaseMqResults.X + Max(0, (clip01_galCaseMqResults.Width - Min(416, clip01_galCaseMqResults.Width)) / 2)
                         Y: =clip01_galCaseMqResults.Y + clip01_galCaseMqResults.Height + 6
                   - clip01_btnCaseMissingNext:
-                      Control: Button@0.0.45
+                      Control: Button
                       Properties:
-                        AccessibleLabel: ="次へ"
+                        AccessibleLabel: ="次の10件"
                         Appearance: ='ButtonCanvas.Appearance'.Secondary
                         DisplayMode: =If(!varCaseRequestConfirm && varCaseMissingPage * 10 < CountRows(colCaseMissingIds), DisplayMode.Edit, DisplayMode.Disabled)
                         Height: =36
                         OnSelect: =Set(varCaseMissingPage, Min(RoundUp(CountRows(colCaseMissingIds) / 10, 0), varCaseMissingPage + 1))
-                        Text: ="次へ"
+                        Text: ="次の10件"
                         Visible: =CountRows(colCaseMissingIds) > 10
-                        Width: =70
-                        X: =24 + clip01_galCaseMqResults.Width - 70
+                        Width: =100
+                        X: =clip01_lblCaseMissingPage.X + clip01_lblCaseMissingPage.Width + 8
                         Y: =clip01_galCaseMqResults.Y + clip01_galCaseMqResults.Height + 6
                   - clip01_lblCaseMissingPage:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         Align: =Align.Center
                         Color: =RGBA(42, 57, 75, 1)
                         Font: =Font.'Segoe UI'
                         Height: =36
-                        Text: =Text((varCaseMissingPage - 1) * 10 + 1, "0") & "～" & Text(Min(varCaseMissingPage * 10, CountRows(colCaseMissingIds)), "0") & "件／" & Text(CountRows(colCaseMissingIds), "0") & "件"
+                        Text: =Text((varCaseMissingPage - 1) * 10 + 1, "0") & "～" & Text(Min(varCaseMissingPage * 10, CountRows(colCaseMissingIds)), "0") & "件／全" & Text(CountRows(colCaseMissingIds), "0") & "件"
                         Visible: =CountRows(colCaseMissingIds) > 10
-                        Width: =clip01_galCaseMqResults.Width - 156
-                        X: =102
+                        Width: =Min(416, clip01_galCaseMqResults.Width) - 216
+                        X: =clip01_btnCaseMissingPrev.X + clip01_btnCaseMissingPrev.Width + 8
                         Y: =clip01_galCaseMqResults.Y + clip01_galCaseMqResults.Height + 6
                   - clip01_btnCaseUnexpectedPrev:
-                      Control: Button@0.0.45
+                      Control: Button
                       Properties:
-                        AccessibleLabel: ="前へ"
+                        AccessibleLabel: ="前の10件"
                         Appearance: ='ButtonCanvas.Appearance'.Secondary
                         DisplayMode: =If(!varCaseRequestConfirm && varCaseUnexpectedPage > 1, DisplayMode.Edit, DisplayMode.Disabled)
                         Height: =36
                         OnSelect: =Set(varCaseUnexpectedPage, Max(1, varCaseUnexpectedPage - 1))
-                        Text: ="前へ"
+                        Text: ="前の10件"
                         Visible: =CountRows(colCaseUnexpectedIds) > 10
-                        Width: =70
-                        X: =24
+                        Width: =100
+                        X: =clip01_galCaseUnexpected.X + Max(0, (clip01_galCaseUnexpected.Width - Min(416, clip01_galCaseUnexpected.Width)) / 2)
                         Y: =clip01_galCaseUnexpected.Y + clip01_galCaseUnexpected.Height + 6
                   - clip01_btnCaseUnexpectedNext:
-                      Control: Button@0.0.45
+                      Control: Button
                       Properties:
-                        AccessibleLabel: ="次へ"
+                        AccessibleLabel: ="次の10件"
                         Appearance: ='ButtonCanvas.Appearance'.Secondary
                         DisplayMode: =If(!varCaseRequestConfirm && varCaseUnexpectedPage * 10 < CountRows(colCaseUnexpectedIds), DisplayMode.Edit, DisplayMode.Disabled)
                         Height: =36
                         OnSelect: =Set(varCaseUnexpectedPage, Min(RoundUp(CountRows(colCaseUnexpectedIds) / 10, 0), varCaseUnexpectedPage + 1))
-                        Text: ="次へ"
+                        Text: ="次の10件"
                         Visible: =CountRows(colCaseUnexpectedIds) > 10
-                        Width: =70
-                        X: =24 + clip01_galCaseUnexpected.Width - 70
+                        Width: =100
+                        X: =clip01_lblCaseUnexpectedPage.X + clip01_lblCaseUnexpectedPage.Width + 8
                         Y: =clip01_galCaseUnexpected.Y + clip01_galCaseUnexpected.Height + 6
                   - clip01_lblCaseUnexpectedPage:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         Align: =Align.Center
                         Color: =RGBA(42, 57, 75, 1)
                         Font: =Font.'Segoe UI'
                         Height: =36
-                        Text: =Text((varCaseUnexpectedPage - 1) * 10 + 1, "0") & "～" & Text(Min(varCaseUnexpectedPage * 10, CountRows(colCaseUnexpectedIds)), "0") & "件／" & Text(CountRows(colCaseUnexpectedIds), "0") & "件"
+                        Text: =Text((varCaseUnexpectedPage - 1) * 10 + 1, "0") & "～" & Text(Min(varCaseUnexpectedPage * 10, CountRows(colCaseUnexpectedIds)), "0") & "件／全" & Text(CountRows(colCaseUnexpectedIds), "0") & "件"
                         Visible: =CountRows(colCaseUnexpectedIds) > 10
-                        Width: =clip01_galCaseUnexpected.Width - 156
-                        X: =102
+                        Width: =Min(416, clip01_galCaseUnexpected.Width) - 216
+                        X: =clip01_btnCaseUnexpectedPrev.X + clip01_btnCaseUnexpectedPrev.Width + 8
                         Y: =clip01_galCaseUnexpected.Y + clip01_galCaseUnexpected.Height + 6
+                  - detailAssigneeValue:
+                      Control: Label
+                      Properties:
+                        Color: =RGBA(42, 57, 75, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =28
+                        Size: =14
+                        Text: =Switch(varEvidenceCase.処理結果判断, "正常", "問題なし", "異常", "要対応", "判断保留", "判断保留", Coalesce(varEvidenceCase.処理結果判断, "未記録"))
+                        Visible: =!clip01_radCaseJudgment.Visible
+                        Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+                        X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+                        Y: =clip01_radCaseJudgment.Y
+                  - detailAssigneeComment:
+                      Control: Label
+                      Properties:
+                        AutoHeight: =true
+                        Color: =RGBA(42, 57, 75, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =28
+                        Size: =14
+                        Text: =Coalesce(varEvidenceCase.担当者コメント, "なし")
+                        Visible: =!clip01_txtCaseComment.Visible
+                        Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+                        X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+                        Y: =clip01_txtCaseComment.Y
+                  - detailReviewSavedResult:
+                      Control: Label
+                      Properties:
+                        Color: =RGBA(42, 57, 75, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =28
+                        Size: =14
+                        Text: |-
+                          =If(varEvidenceCase.レビュー状態 = "確認済み", "レビュー結果: 承認", "レビュー結果: 差し戻し")
+                        Visible: =varEvidenceCase.レビュー状態 = "確認済み" || varEvidenceCase.レビュー状態 = "差し戻し"
+                        Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+                        X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+                        Y: =clip01_lblCaseReviewStatus.Y + clip01_lblCaseReviewStatus.Height + 4
+                  - detailReviewSavedReason:
+                      Control: Label
+                      Properties:
+                        AutoHeight: =true
+                        Color: =RGBA(42, 57, 75, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =28
+                        Size: =14
+                        Text: |-
+                          ="差し戻し理由: " & varEvidenceCase.差し戻し理由
+                        Visible: =(varEvidenceCase.レビュー状態 = "確認済み" || varEvidenceCase.レビュー状態 = "差し戻し") && !IsBlank(varEvidenceCase.差し戻し理由)
+                        Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+                        X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+                        Y: =detailReviewSavedResult.Y + detailReviewSavedResult.Height + 2
+                  - detailReviewHeading:
+                      Control: Label
+                      Properties:
+                        Color: =RGBA(42, 57, 75, 1)
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =28
+                        Size: =14
+                        Text: ="レビュー結果"
+                        Visible: =varEvidenceCase.レビュー状態 = "依頼中" || varEvidenceCase.レビュー状態 = "再依頼"
+                        Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+                        X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+                        Y: =clip01_lblCaseReviewStatus.Y + clip01_lblCaseReviewStatus.Height + 10
+                  - detailReviewDecision:
+                      Control: ModernRadio
+                      Properties:
+                        AccessibleLabel: ="レビュー結果"
+                        Default: =Blank()
+                        DisplayMode: =If((varEvidenceCase.レビュー状態 = "依頼中" || varEvidenceCase.レビュー状態 = "再依頼") && !IsBlank(varEvidenceCase.架空ログ証跡件) && CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 && varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && !varDetailReviewBusy && IsBlank(varDetailReviewError) && !varCaseRequestConfirm && !varCaseRequestBusy, DisplayMode.Edit, DisplayMode.Disabled)
+                        Height: =36
+                        Items: =["承認", "差し戻し"]
+                        Layout: =OptionLayout.Horizontal
+                        Visible: =varEvidenceCase.レビュー状態 = "依頼中" || varEvidenceCase.レビュー状態 = "再依頼"
+                        Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+                        X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+                        Y: =detailReviewHeading.Y + detailReviewHeading.Height + 2
+                  - detailReviewReasonHeading:
+                      Control: Label
+                      Properties:
+                        Color: =RGBA(42, 57, 75, 1)
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Semibold
+                        Height: =28
+                        Size: =14
+                        Text: ="差し戻し理由"
+                        Visible: =(varEvidenceCase.レビュー状態 = "依頼中" || varEvidenceCase.レビュー状態 = "再依頼") && detailReviewDecision.Selected.Value = "差し戻し"
+                        Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+                        X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+                        Y: =detailReviewDecision.Y + detailReviewDecision.Height + 6
+                  - detailReviewReason:
+                      Control: ModernTextInput
+                      Properties:
+                        AccessibleLabel: ="差し戻し理由"
+                        DisplayMode: =If((varEvidenceCase.レビュー状態 = "依頼中" || varEvidenceCase.レビュー状態 = "再依頼") && !IsBlank(varEvidenceCase.架空ログ証跡件) && CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 && varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && !varDetailReviewBusy && IsBlank(varDetailReviewError) && !varCaseRequestConfirm && !varCaseRequestBusy, DisplayMode.Edit, DisplayMode.Disabled)
+                        Height: =64
+                        Required: =detailReviewDecision.Selected.Value = "差し戻し"
+                        Type: =TextInputType.Multiline
+                        Visible: =(varEvidenceCase.レビュー状態 = "依頼中" || varEvidenceCase.レビュー状態 = "再依頼") && detailReviewDecision.Selected.Value = "差し戻し"
+                        Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+                        X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+                        Y: =detailReviewReasonHeading.Y + detailReviewReasonHeading.Height + 2
+                  - detailReviewRecord:
+                      Control: Button
+                      Properties:
+                        AccessibleLabel: ="レビューを完了"
+                        Appearance: ='ButtonCanvas.Appearance'.Primary
+                        DisplayMode: =If((varEvidenceCase.レビュー状態 = "依頼中" || varEvidenceCase.レビュー状態 = "再依頼") && !IsBlank(varEvidenceCase.架空ログ証跡件) && CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 && varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && !varDetailReviewBusy && IsBlank(varDetailReviewError) && !varCaseRequestConfirm && !varCaseRequestBusy && (detailReviewDecision.Selected.Value = "承認" || (detailReviewDecision.Selected.Value = "差し戻し" && !IsBlank(Trim(detailReviewReason.Text)))), DisplayMode.Edit, DisplayMode.Disabled)
+                        Height: =42
+                        OnSelect: |-
+                          =If(
+                            (varEvidenceCase.レビュー状態 = "依頼中" || varEvidenceCase.レビュー状態 = "再依頼") && !IsBlank(varEvidenceCase.架空ログ証跡件) && CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 && varEvidenceCase.処理状態 = "転記済み" && varEvidenceCase.Excel反映確認 = "全文一致" && !varDetailReviewBusy && IsBlank(varDetailReviewError) && !varCaseRequestConfirm && !varCaseRequestBusy && (detailReviewDecision.Selected.Value = "承認" || (detailReviewDecision.Selected.Value = "差し戻し" && !IsBlank(Trim(detailReviewReason.Text)))),
+                            Set(varDetailReviewBusy, true);
+                            Set(varDetailReviewError, "");
+                            With(
+                              {reviewId: varEvidenceCase.架空ログ証跡件, reviewVersion: varEvidenceCase.バージョン番号,
+                                reviewStatus: If(detailReviewDecision.Selected.Value = "承認", "確認済み", "差し戻し"), reviewReason: If(detailReviewDecision.Selected.Value = "差し戻し", Trim(detailReviewReason.Text), Blank())},
+                              IfError(
+                                Refresh('架空ログ証跡件'); Refresh('件別ファイル');
+                                With(
+                                  {currentCase: LookUp('架空ログ証跡件', 架空ログ証跡件 = reviewId)},
+                                  If(
+                                    !IsBlank(currentCase.架空ログ証跡件) && currentCase.バージョン番号 = reviewVersion &&
+                                    (currentCase.レビュー状態 = "依頼中" || currentCase.レビュー状態 = "再依頼") &&
+                                    currentCase.処理状態 = "転記済み" && currentCase.Excel反映確認 = "全文一致" &&
+                                    CountIf('件別ファイル', 対象件.架空ログ証跡件 = reviewId) = 2,
+                                    With(
+                                      {savedCase: Patch('架空ログ証跡件', currentCase, {レビュー状態: reviewStatus, 差し戻し理由: reviewReason})},
+                                      Refresh('架空ログ証跡件');
+                                      With(
+                                        {confirmedCase: LookUp('架空ログ証跡件', 架空ログ証跡件 = reviewId)},
+                                        If(
+                                          savedCase.架空ログ証跡件 = reviewId && confirmedCase.架空ログ証跡件 = reviewId &&
+                                          confirmedCase.レビュー状態 = reviewStatus &&
+                                          Coalesce(confirmedCase.差し戻し理由, "") = Coalesce(reviewReason, ""),
+                                          Set(varEvidenceCase, confirmedCase); Reset(detailReviewDecision); Reset(detailReviewReason); Reset(clip01_radCaseJudgment); Reset(clip01_txtCaseComment),
+                                          Set(varDetailReviewError, "レビュー結果の保存を確認できません。進捗一覧から開き直して状態を確認してください。")
+                                        )
+                                      )
+                                    ),
+                                    Set(varEvidenceCase, currentCase);
+                                    Set(varDetailReviewError, "表示中に状態が変わりました。進捗一覧から開き直して確認してください。")
+                                  )
+                                ),
+                                Set(varDetailReviewError, "レビュー結果の保存を確認できません。進捗一覧から開き直して状態を確認してください。")
+                              )
+                            );
+                            Set(varDetailReviewBusy, false)
+                          )
+                        Text: =If(varDetailReviewBusy, "保存中…", "レビューを完了")
+                        Visible: =varEvidenceCase.レビュー状態 = "依頼中" || varEvidenceCase.レビュー状態 = "再依頼"
+                        Width: =Min(200, If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48))
+                        X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+                        Y: =If(detailReviewReason.Visible, detailReviewReason.Y + detailReviewReason.Height + 12, detailReviewDecision.Y + detailReviewDecision.Height + 12)
+                  - detailReviewError:
+                      Control: Label
+                      Properties:
+                        AutoHeight: =true
+                        Color: =RGBA(163, 38, 45, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =28
+                        Size: =14
+                        Text: =varDetailReviewError
+                        Visible: =!IsBlank(varDetailReviewError)
+                        Width: =If(Parent.Width >= 900, (Parent.Width - 72) / 2, Parent.Width - 48)
+                        X: =If(Parent.Width >= 900, Parent.Width / 2 + 12, 24)
+                        Y: =If(detailReviewRecord.Visible, detailReviewRecord.Y + detailReviewRecord.Height + 4, If(detailReviewSavedReason.Visible, detailReviewSavedReason.Y + detailReviewSavedReason.Height + 4, If(detailReviewSavedResult.Visible, detailReviewSavedResult.Y + detailReviewSavedResult.Height + 4, clip01_lblCaseReviewStatus.Y + clip01_lblCaseReviewStatus.Height + 4)))
       - clip01_rectCaseRequestOverlay:
-          Control: Rectangle@2.3.0
+          Control: Rectangle
           Properties:
             Fill: =RGBA(0, 0, 0, 0.35)
             Height: =Parent.Height
             Visible: =varCaseRequestConfirm
             Width: =Parent.Width
       - clip01_rectCaseRequestDialog:
-          Control: Rectangle@2.3.0
+          Control: Rectangle
           Properties:
             Fill: =RGBA(255, 255, 255, 1)
             Height: =188
@@ -693,7 +825,7 @@ Screens:
             X: =(Parent.Width - Self.Width) / 2
             Y: =Max(16, (Parent.Height - Self.Height) / 2)
       - clip01_btnCaseRequestSend:
-          Control: Button@0.0.45
+          Control: Button
           Properties:
             AccessibleLabel: ="依頼する"
             Appearance: ='ButtonCanvas.Appearance'.Primary
@@ -704,13 +836,11 @@ Screens:
                 varCaseRequestConfirm && varCaseConfirmId = varEvidenceCase.架空ログ証跡件 &&
                 !varCaseRequestBusy &&
                 IsBlank(varCaseRequestError) &&
-                varDemoRole = "担当者役" &&
                 CountIf('件別ファイル', 対象件.架空ログ証跡件 = varEvidenceCase.架空ログ証跡件) = 2 &&
                 varEvidenceCase.処理状態 = "転記済み" &&
                 varEvidenceCase.Excel反映確認 = "全文一致" &&
-                !IsBlank(clip01_radCaseCompare.Selected.Value) &&
                 !IsBlank(clip01_radCaseJudgment.Selected.Value) &&
-                (clip01_radCaseJudgment.Selected.Value = "正常" || !IsBlank(Trim(clip01_txtCaseComment.Text))) &&
+                (clip01_radCaseJudgment.Selected.Value = "問題なし" || !IsBlank(Trim(clip01_txtCaseComment.Text))) &&
                 (IsBlank(varEvidenceCase.レビュー状態) || varEvidenceCase.レビュー状態 = "未依頼" || varEvidenceCase.レビュー状態 = "差し戻し"),
                 Set(varCaseRequestConfirm, false);
                 Set(varCaseRequestBusy, true);
@@ -722,8 +852,7 @@ Screens:
                         '架空ログ証跡件',
                         varEvidenceCase,
                         {
-                          転記照合: clip01_radCaseCompare.Selected.Value,
-                          処理結果判断: clip01_radCaseJudgment.Selected.Value,
+                          処理結果判断: Switch(clip01_radCaseJudgment.Selected.Value, "問題なし", "正常", "要対応", "異常", "判断保留", "判断保留", Blank()),
                           担当者コメント: clip01_txtCaseComment.Text,
                           レビュー状態: If(varEvidenceCase.レビュー状態 = "差し戻し", "再依頼", "依頼中")
                         }
@@ -738,8 +867,7 @@ Screens:
                     With(
                       {confirmedCase: LookUp('架空ログ証跡件', 架空ログ証跡件 = varCaseRequestSavedId)},
                       If(
-                        confirmedCase.転記照合 = clip01_radCaseCompare.Selected.Value &&
-                        confirmedCase.処理結果判断 = clip01_radCaseJudgment.Selected.Value &&
+                        confirmedCase.処理結果判断 = Switch(clip01_radCaseJudgment.Selected.Value, "問題なし", "正常", "要対応", "異常", "判断保留", "判断保留", Blank()) &&
                         Coalesce(confirmedCase.担当者コメント, "") = Coalesce(clip01_txtCaseComment.Text, "") &&
                         confirmedCase.レビュー状態 = If(varEvidenceCase.レビュー状態 = "差し戻し", "再依頼", "依頼中"),
                         Set(varEvidenceCase, confirmedCase);
@@ -760,7 +888,7 @@ Screens:
             X: =clip01_rectCaseRequestDialog.X + (clip01_rectCaseRequestDialog.Width - 122)
             Y: =clip01_rectCaseRequestDialog.Y + (132)
       - clip01_lblCaseRequestQuestion:
-          Control: Label@2.5.1
+          Control: Label
           Properties:
             Color: =RGBA(42, 57, 75, 1)
             Font: =Font.'Segoe UI'
@@ -771,19 +899,19 @@ Screens:
             X: =clip01_rectCaseRequestDialog.X + (20)
             Y: =clip01_rectCaseRequestDialog.Y + (16)
       - clip01_lblCaseRequestTarget:
-          Control: Label@2.5.1
+          Control: Label
           Properties:
             Color: =RGBA(42, 57, 75, 1)
             Font: =Font.'Segoe UI'
             Height: =54
             Size: =14
-            Text: =varEvidenceCase.件の表示名
-            Visible: =varCaseRequestConfirm
+            Text: =""
+            Visible: =false
             Width: =clip01_rectCaseRequestDialog.Width - 40
             X: =clip01_rectCaseRequestDialog.X + (20)
             Y: =clip01_rectCaseRequestDialog.Y + (62)
       - clip02_btnCaseRequestCancel:
-          Control: Button@0.0.45
+          Control: Button
           Properties:
             AccessibleLabel: ="キャンセル"
             Appearance: ='ButtonCanvas.Appearance'.Secondary

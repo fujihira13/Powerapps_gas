@@ -4,23 +4,29 @@ Screens:
       Fill: =RGBA(255, 255, 255, 1)
       LoadingSpinnerColor: =RGBA(0, 120, 212, 1)
       OnVisible: |-
-        =If(
+        =Set(varS01EnvOpen, false);
+        If(
           Coalesce(varS01NewIntakeRequested, false) && !varT001Saving && !Coalesce(varS01Starting, false) && !Coalesce(varS01StartUnknown, false),
           Set(varS01NewIntakeRequested, false);
           Set(varT001Saved, Blank());
           Set(varEvidenceCase, Blank());
           Set(varT001SaveUnknown, false);
           Set(varS01FlowStatus, "");
+          Set(varS01EnvChoice, Blank());
           ResetForm(Form1);
           NewForm(Form1);
           ResetForm(frmS01OneExcel);
           NewForm(frmS01OneExcel);
           ResetForm(frmS01OneLog);
           NewForm(frmS01OneLog)
-        )
+        );
+        Set(varS01SettingsReadOk, true);
+        IfError(Refresh('架空ログ転記先'), Set(varS01SettingsReadOk, false));
+        If(!varS01SettingsReadOk, Set(varS01FlowStatus, "環境・サーバーの登録を読み取れません。進捗一覧へ戻り、もう一度開いてください。"));
+        If(varS01SettingsReadOk && !IsBlank(varS01EnvChoice) && IsBlank(LookUp('架空ログ転記先', cr6cb_environment = varS01EnvChoice && cr6cb_isactive = '有効 (架空ログ転記先)'.有効 && (cr6cb_environmentenabled = Blank() || cr6cb_environmentenabled = '環境の使用状態 (架空ログ転記先)'.使用中))), Set(varS01EnvChoice, Blank()); Reset(envS01ValueBridge); Set(varS01ServerReset, true); Set(varS01ServerReset, false))
     Children:
       - Form1:
-          Control: Form@2.4.4
+          Control: Form
           Variant: Classic
           Layout: Vertical
           Properties:
@@ -58,10 +64,10 @@ Screens:
             SnapToColumns: =false
             Width: =Parent.Width - 50
             X: =25
-            Y: =If(IsBlank(lblT001MqMode.Text), lblT001MqMode.Y, lblT001MqMode.Y + lblT001MqMode.Height + 8)
+            Y: =68
           Children:
             - ログ名_DataCard1:
-                Control: TypedDataCard@1.0.7
+                Control: TypedDataCard
                 Variant: ClassicTextualEdit
                 IsLocked: true
                 Properties:
@@ -78,7 +84,7 @@ Screens:
                   Y: =0
                 Children:
                   - DataCardKey1:
-                      Control: Label@2.5.1
+                      Control: Label
                       MetadataKey: FieldName
                       Properties:
                         AutoHeight: =true
@@ -99,7 +105,7 @@ Screens:
                         X: =30
                         Y: =10
                   - DataCardValue1:
-                      Control: Classic/TextInput@2.3.2
+                      Control: Classic/TextInput
                       MetadataKey: FieldValue
                       Properties:
                         BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
@@ -127,7 +133,7 @@ Screens:
                         X: =30
                         Y: =DataCardKey1.Y + DataCardKey1.Height + 5
                   - ErrorMessage1:
-                      Control: Label@2.5.1
+                      Control: Label
                       MetadataKey: ErrorMessage
                       Properties:
                         AutoHeight: =true
@@ -152,7 +158,7 @@ Screens:
                         X: =30
                         Y: =DataCardValue1.Y + DataCardValue1.Height
                   - StarVisible1:
-                      Control: Label@2.5.1
+                      Control: Label
                       MetadataKey: FieldRequired
                       Properties:
                         Align: =Align.Center
@@ -173,7 +179,7 @@ Screens:
                         Wrap: =false
                         Y: =DataCardKey1.Y
             - サーバー名_DataCard1:
-                Control: TypedDataCard@1.0.7
+                Control: TypedDataCard
                 Variant: ClassicTextualEdit
                 IsLocked: true
                 Properties:
@@ -189,7 +195,7 @@ Screens:
                   Y: =If(App.Width < 720, 1, 0)
                 Children:
                   - DataCardKey3:
-                      Control: Label@2.5.1
+                      Control: Label
                       MetadataKey: FieldName
                       Properties:
                         AutoHeight: =true
@@ -210,7 +216,7 @@ Screens:
                         X: =30
                         Y: =10
                   - DataCardValue3:
-                      Control: Classic/DropDown@2.3.1
+                      Control: Classic/DropDown
                       MetadataKey: FieldValue
                       Properties:
                         BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
@@ -224,18 +230,19 @@ Screens:
                         HoverBorderColor: =RGBA(16, 110, 190, 1)
                         HoverColor: =RGBA(50, 49, 48, 1)
                         HoverFill: =RGBA(255, 255, 255, 1)
-                        Items: =Sort(AddColumns(Distinct(Filter('架空ログ転記先', cr6cb_isactive = '有効 (架空ログ転記先)'.有効 && cr6cb_environment = DataCardValue2.Selected.Value), cr6cb_server), DisplayName, Substitute(Value, "架空", "")), DisplayName)
+                        Items: =Sort(AddColumns(Distinct(Filter('架空ログ転記先', cr6cb_isactive = '有効 (架空ログ転記先)'.有効 && (cr6cb_environmentenabled = Blank() || cr6cb_environmentenabled = '環境の使用状態 (架空ログ転記先)'.使用中) && cr6cb_environment = envS01ValueBridge.Selected.Value), cr6cb_server), DisplayName, Substitute(Value, "架空", "")), DisplayName)
                         Items.Value: =DisplayName
                         PaddingLeft: =5
                         PressedBorderColor: =RGBA(0, 120, 212, 1)
                         PressedColor: =RGBA(50, 49, 48, 1)
                         PressedFill: =RGBA(255, 255, 255, 1)
+                        Reset: =varS01ServerReset
                         Tooltip: =Parent.DisplayName
                         Width: =Parent.Width - 60
                         X: =30
                         Y: =DataCardKey3.Y + DataCardKey3.Height + 5
                   - ErrorMessage3:
-                      Control: Label@2.5.1
+                      Control: Label
                       MetadataKey: ErrorMessage
                       Properties:
                         AutoHeight: =true
@@ -260,7 +267,7 @@ Screens:
                         X: =30
                         Y: =DataCardValue3.Y + DataCardValue3.Height
                   - StarVisible3:
-                      Control: Label@2.5.1
+                      Control: Label
                       MetadataKey: FieldRequired
                       Properties:
                         Align: =Align.Center
@@ -281,7 +288,7 @@ Screens:
                         Wrap: =false
                         Y: =DataCardKey3.Y
             - 環境名_DataCard1:
-                Control: TypedDataCard@1.0.7
+                Control: TypedDataCard
                 Variant: ClassicTextualEdit
                 IsLocked: true
                 Properties:
@@ -291,13 +298,68 @@ Screens:
                   DisplayName: ="環境"
                   MaxLength: =DataSourceInfo([@'架空ログ証跡件'], DataSourceInfo.MaxLength, 環境)
                   Required: =true
-                  Update: =DataCardValue2.Selected.Value
+                  Update: =envS01ValueBridge.Selected.Value
                   Width: =If(App.Width < 720, App.Width - 50, (App.Width - 50) / 2)
                   X: =0
                   Y: =0
                 Children:
+                  - envS01Field:
+                      Control: Classic/Button
+                      Properties:
+                        Align: =Align.Left
+                        BorderColor: =envS01ValueBridge.BorderColor
+                        BorderThickness: =1
+                        Color: =RGBA(42, 57, 75, 1)
+                        DisabledColor: =envS01ValueBridge.DisabledColor
+                        DisabledFill: =envS01ValueBridge.DisabledFill
+                        DisplayMode: =envS01ValueBridge.DisplayMode
+                        Fill: =If(Coalesce(varS01EnvOpen, false), RGBA(232, 242, 252, 1), RGBA(255, 255, 255, 1))
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Normal
+                        Height: =envS01ValueBridge.Height
+                        HoverBorderColor: =RGBA(16, 110, 190, 1)
+                        HoverColor: =RGBA(42, 57, 75, 1)
+                        HoverFill: =RGBA(232, 242, 252, 1)
+                        OnSelect: =Set(varS01EnvOpen, !Coalesce(varS01EnvOpen, false))
+                        PressedColor: =RGBA(42, 57, 75, 1)
+                        PressedFill: =RGBA(232, 242, 252, 1)
+                        RadiusBottomLeft: =0
+                        RadiusBottomRight: =0
+                        RadiusTopLeft: =0
+                        RadiusTopRight: =0
+                        Size: =13
+                        Text: =envS01ValueBridge.Selected.DisplayName
+                        Tooltip: ="環境を選択 " & envS01ValueBridge.Selected.DisplayName
+                        Width: =envS01ValueBridge.Width - 34
+                        X: =envS01ValueBridge.X
+                        Y: =envS01ValueBridge.Y
+                  - envS01Arrow:
+                      Control: Classic/Button
+                      Properties:
+                        BorderThickness: =0
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisplayMode: =envS01ValueBridge.DisplayMode
+                        Fill: =RGBA(16, 110, 190, 1)
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Normal
+                        Height: =envS01ValueBridge.Height
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =RGBA(16, 110, 190, 1)
+                        OnSelect: =Select(envS01Field)
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(16, 110, 190, 1)
+                        RadiusBottomLeft: =0
+                        RadiusBottomRight: =0
+                        RadiusTopLeft: =0
+                        RadiusTopRight: =0
+                        Size: =22
+                        Text: =""
+                        Tooltip: ="環境の候補を開閉する"
+                        Width: =34
+                        X: =envS01ValueBridge.X + envS01ValueBridge.Width - 34
+                        Y: =envS01ValueBridge.Y
                   - DataCardKey2:
-                      Control: Label@2.5.1
+                      Control: Label
                       MetadataKey: FieldName
                       Properties:
                         AutoHeight: =true
@@ -317,33 +379,35 @@ Screens:
                         Wrap: =false
                         X: =30
                         Y: =10
-                  - DataCardValue2:
-                      Control: Classic/DropDown@2.3.1
+                  - envS01ValueBridge:
+                      Control: Classic/DropDown
                       MetadataKey: FieldValue
                       Properties:
                         BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
                         Color: =RGBA(50, 49, 48, 1)
-                        Default: =""
+                        Default: =Substitute(Coalesce(varS01EnvChoice, ""), "架空", "")
                         DisabledBorderColor: =RGBA(0, 0, 0, 0)
                         DisabledColor: =RGBA(161, 159, 157, 1)
                         DisabledFill: =RGBA(242, 242, 241, 0)
                         DisplayMode: =If(varT001Saving || Coalesce(varT001SaveUnknown, false) || !IsBlank(varT001Saved.架空ログ証跡件) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false), DisplayMode.Disabled, Parent.DisplayMode)
                         Font: =Font.'Segoe UI'
                         HoverBorderColor: =RGBA(16, 110, 190, 1)
-                        HoverColor: =RGBA(50, 49, 48, 1)
-                        HoverFill: =RGBA(255, 255, 255, 1)
-                        Items: =Sort(Filter(AddColumns(Distinct(Filter('架空ログ転記先', cr6cb_isactive = '有効 (架空ログ転記先)'.有効), cr6cb_environment), DisplayName, Substitute(Value, "架空", "")), DisplayName <> "環境長文"), DisplayName)
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =RGBA(16, 110, 190, 1)
+                        Items: =Sort(Filter(AddColumns(Distinct(Filter('架空ログ転記先', cr6cb_isactive = '有効 (架空ログ転記先)'.有効 && (cr6cb_environmentenabled = Blank() || cr6cb_environmentenabled = '環境の使用状態 (架空ログ転記先)'.使用中)), cr6cb_environment), DisplayName, Substitute(Value, "架空", "")), DisplayName <> "環境長文"), DisplayName)
                         Items.Value: =DisplayName
                         PaddingLeft: =5
                         PressedBorderColor: =RGBA(0, 120, 212, 1)
                         PressedColor: =RGBA(50, 49, 48, 1)
                         PressedFill: =RGBA(255, 255, 255, 1)
+                        TabIndex: =-1
                         Tooltip: =Parent.DisplayName
+                        Visible: =false
                         Width: =Parent.Width - 60
                         X: =30
                         Y: =DataCardKey2.Y + DataCardKey2.Height + 5
                   - ErrorMessage2:
-                      Control: Label@2.5.1
+                      Control: Label
                       MetadataKey: ErrorMessage
                       Properties:
                         AutoHeight: =true
@@ -366,9 +430,9 @@ Screens:
                         Visible: =Parent.DisplayMode=DisplayMode.Edit
                         Width: =Parent.Width - 60
                         X: =30
-                        Y: =DataCardValue2.Y + DataCardValue2.Height
+                        Y: =envS01ValueBridge.Y + envS01ValueBridge.Height
                   - StarVisible2:
-                      Control: Label@2.5.1
+                      Control: Label
                       MetadataKey: FieldRequired
                       Properties:
                         Align: =Align.Center
@@ -388,8 +452,23 @@ Screens:
                         Width: =30
                         Wrap: =false
                         Y: =DataCardKey2.Y
+                  - envS01Chevron:
+                      Control: Classic/Icon
+                      Properties:
+                        AccessibleLabel: ="環境の候補を開閉する"
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisplayMode: =envS01ValueBridge.DisplayMode
+                        Height: =20
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        Icon: =Icon.ChevronDown
+                        OnSelect: =Select(envS01Field)
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        Tooltip: ="環境の候補を開閉する"
+                        Width: =20
+                        X: =envS01Arrow.X + (envS01Arrow.Width - Self.Width) / 2
+                        Y: =envS01Arrow.Y + (envS01Arrow.Height - Self.Height) / 2
             - s01OneInitialStatus_DataCard:
-                Control: TypedDataCard@1.0.7
+                Control: TypedDataCard
                 Variant: ClassicTextualEdit
                 Properties:
                   DataField: ="cr6cb_processingstatus"
@@ -404,7 +483,7 @@ Screens:
                   X: =0
                   Y: =2
             - s01OneWorkbookName_DataCard:
-                Control: TypedDataCard@1.0.7
+                Control: TypedDataCard
                 Variant: ClassicTextualEdit
                 Properties:
                   DataField: ="cr6cb_batchfilename"
@@ -419,7 +498,7 @@ Screens:
                   X: =1
                   Y: =2
       - frmS01OneLog:
-          Control: Form@2.4.4
+          Control: Form
           Variant: Classic
           Layout: Vertical
           Properties:
@@ -459,7 +538,7 @@ Screens:
             Y: =If(Parent.Width < 720, frmS01OneExcel.Y + frmS01OneExcel.Height + 8, frmS01OneExcel.Y)
           Children:
             - cardS01OneLogParent:
-                Control: TypedDataCard@1.0.7
+                Control: TypedDataCard
                 Variant: ClassicComboBoxEdit
                 Properties:
                   DataField: ="cr6cb_evidencecase"
@@ -473,7 +552,7 @@ Screens:
                   X: =0
                   Y: =0
             - cardS01OneLogRole:
-                Control: TypedDataCard@1.0.7
+                Control: TypedDataCard
                 Variant: ClassicTextualEdit
                 Properties:
                   DataField: ="cr6cb_filerole"
@@ -488,7 +567,7 @@ Screens:
                   X: =0
                   Y: =1
             - cardS01OneLogName:
-                Control: TypedDataCard@1.0.7
+                Control: TypedDataCard
                 Variant: ClassicTextualEdit
                 Properties:
                   DataField: ="cr6cb_filename"
@@ -503,7 +582,7 @@ Screens:
                   X: =0
                   Y: =2
             - cardS01OneLogAttachment:
-                Control: TypedDataCard@1.0.7
+                Control: TypedDataCard
                 Variant: ClassicAttachmentsEdit
                 Properties:
                   BorderColor: =RGBA(245, 245, 245, 1)
@@ -518,7 +597,7 @@ Screens:
                   Y: =3
                 Children:
                   - lblS01OneLogAttachment:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         AutoHeight: =true
                         Color: =RGBA(42, 57, 75, 1)
@@ -529,7 +608,7 @@ Screens:
                         Width: =Parent.Width - 12
                         X: =6
                   - attS01OneLog:
-                      Control: Attachments@2.3.0
+                      Control: Attachments
                       MetadataKey: FieldValue
                       Properties:
                         AccessibleLabel: ="サーバーログ .txt 1件"
@@ -547,7 +626,7 @@ Screens:
                         X: =6
                         Y: =-20
                   - btnS01LogChange:
-                      Control: Button@0.0.45
+                      Control: Button
                       Properties:
                         AccessibleLabel: ="変更"
                         Appearance: ='ButtonCanvas.Appearance'.Secondary
@@ -560,7 +639,7 @@ Screens:
                         X: =6
                         Y: =80
                   - btnS01LogRemove:
-                      Control: Button@0.0.45
+                      Control: Button
                       Properties:
                         AccessibleLabel: ="削除"
                         Appearance: ='ButtonCanvas.Appearance'.Secondary
@@ -573,7 +652,7 @@ Screens:
                         X: =106
                         Y: =80
       - frmS01OneExcel:
-          Control: Form@2.4.4
+          Control: Form
           Variant: Classic
           Layout: Vertical
           Properties:
@@ -660,7 +739,7 @@ Screens:
             Y: =Form1.Y + Form1.Height + 8
           Children:
             - cardS01OneExcelParent:
-                Control: TypedDataCard@1.0.7
+                Control: TypedDataCard
                 Variant: ClassicComboBoxEdit
                 Properties:
                   DataField: ="cr6cb_evidencecase"
@@ -674,7 +753,7 @@ Screens:
                   X: =0
                   Y: =0
             - cardS01OneExcelRole:
-                Control: TypedDataCard@1.0.7
+                Control: TypedDataCard
                 Variant: ClassicTextualEdit
                 Properties:
                   DataField: ="cr6cb_filerole"
@@ -689,7 +768,7 @@ Screens:
                   X: =0
                   Y: =1
             - cardS01OneExcelName:
-                Control: TypedDataCard@1.0.7
+                Control: TypedDataCard
                 Variant: ClassicTextualEdit
                 Properties:
                   DataField: ="cr6cb_filename"
@@ -704,7 +783,7 @@ Screens:
                   X: =0
                   Y: =2
             - cardS01OneExcelAttachment:
-                Control: TypedDataCard@1.0.7
+                Control: TypedDataCard
                 Variant: ClassicAttachmentsEdit
                 Properties:
                   BorderColor: =RGBA(245, 245, 245, 1)
@@ -719,7 +798,7 @@ Screens:
                   Y: =3
                 Children:
                   - lblS01OneExcelAttachment:
-                      Control: Label@2.5.1
+                      Control: Label
                       Properties:
                         AutoHeight: =true
                         Color: =RGBA(42, 57, 75, 1)
@@ -730,7 +809,7 @@ Screens:
                         Width: =Parent.Width - 12
                         X: =6
                   - attS01OneExcel:
-                      Control: Attachments@2.3.0
+                      Control: Attachments
                       MetadataKey: FieldValue
                       Properties:
                         AccessibleLabel: ="更新対象一覧 Excel 1冊"
@@ -748,7 +827,7 @@ Screens:
                         X: =6
                         Y: =-20
                   - btnS01ExcelChange:
-                      Control: Button@0.0.45
+                      Control: Button
                       Properties:
                         AccessibleLabel: ="変更"
                         Appearance: ='ButtonCanvas.Appearance'.Secondary
@@ -761,7 +840,7 @@ Screens:
                         X: =6
                         Y: =80
                   - btnS01ExcelRemove:
-                      Control: Button@0.0.45
+                      Control: Button
                       Properties:
                         AccessibleLabel: ="削除"
                         Appearance: ='ButtonCanvas.Appearance'.Secondary
@@ -774,7 +853,7 @@ Screens:
                         X: =106
                         Y: =80
       - ScreenContainer1:
-          Control: GroupContainer@1.5.0
+          Control: GroupContainer
           Variant: AutoLayout
           Properties:
             Fill: =RGBA(245, 245, 245, 1)
@@ -790,7 +869,7 @@ Screens:
             Width: =Parent.Width
           Children:
             - HeaderContainer1:
-                Control: GroupContainer@1.5.0
+                Control: GroupContainer
                 Variant: AutoLayout
                 Properties:
                   Fill: =RGBA(255, 255, 255, 1)
@@ -809,7 +888,7 @@ Screens:
                   RadiusTopLeft: =8
                   RadiusTopRight: =8
             - MainContainer1:
-                Control: GroupContainer@1.5.0
+                Control: GroupContainer
                 Variant: AutoLayout
                 Properties:
                   Fill: =RGBA(255, 255, 255, 1)
@@ -826,7 +905,7 @@ Screens:
                   RadiusTopLeft: =8
                   RadiusTopRight: =8
             - FooterContainer1:
-                Control: GroupContainer@1.5.0
+                Control: GroupContainer
                 Variant: AutoLayout
                 Properties:
                   Fill: =RGBA(255, 255, 255, 1)
@@ -845,7 +924,7 @@ Screens:
                   RadiusTopLeft: =8
                   RadiusTopRight: =8
       - btnT001Save:
-          Control: Button@0.0.45
+          Control: Button
           Properties:
             AccessibleLabel: ="照合を開始"
             DisplayMode: |-
@@ -856,11 +935,14 @@ Screens:
                   logFile:First(attS01OneLog.Attachments),
                   bookFile:First(attS01OneExcel.Attachments)
                 },
-                If(varT001Saving || Coalesce(varT001SaveUnknown, false) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false) || !IsBlank(varT001Saved.架空ログ証跡件) || !Form1.Valid || logCount <> 1 || bookCount <> 1 || !EndsWith(Lower(logFile.Name), ".txt") || !EndsWith(Lower(bookFile.Name), ".xlsx") || IsBlank(DataCardValue2.Selected.Value) || IsBlank(DataCardValue3.Selected.Value), DisplayMode.Disabled, DisplayMode.Edit)
+                If(varT001Saving || Coalesce(varT001SaveUnknown, false) || Coalesce(varS01Starting, false) || Coalesce(varS01StartUnknown, false) || !IsBlank(varT001Saved.架空ログ証跡件) || !Form1.Valid || logCount <> 1 || bookCount <> 1 || !EndsWith(Lower(logFile.Name), ".txt") || !EndsWith(Lower(bookFile.Name), ".xlsx") || IsBlank(envS01ValueBridge.Selected.Value) || IsBlank(DataCardValue3.Selected.Value), DisplayMode.Disabled, DisplayMode.Edit)
               )
             Height: =44
             OnSelect: |-
-              =If(
+              =Set(varS01SettingsReadOk, true);
+              IfError(Refresh('架空ログ転記先'), Set(varS01SettingsReadOk, false));
+              If(varS01SettingsReadOk && CountRows(Filter('架空ログ転記先', cr6cb_environment = envS01ValueBridge.Selected.Value && cr6cb_server = DataCardValue3.Selected.Value && cr6cb_isactive = '有効 (架空ログ転記先)'.有効 && (cr6cb_environmentenabled = Blank() || cr6cb_environmentenabled = '環境の使用状態 (架空ログ転記先)'.使用中))) = 1,
+              If(
                   !varT001Saving &&
                   !Coalesce(varT001SaveUnknown, false) &&
                   IsBlank(varT001Saved.架空ログ証跡件) &&
@@ -878,27 +960,28 @@ Screens:
                           EndsWith(Lower(logFile.Name), ".txt") &&
                           EndsWith(Lower(bookFile.Name), ".xlsx") &&
                           Form1.Valid &&
-                          !IsBlank(DataCardValue2.Selected.Value) &&
+                          !IsBlank(envS01ValueBridge.Selected.Value) &&
                           !IsBlank(DataCardValue3.Selected.Value),
                           Set(varT001Saving, true);
                           Set(varT001SaveUnknown, false);
                           Set(varS01StartUnknown, false);
                           Set(varT001SavingLogName, logFile.Name);
                           Set(varT001SavingWorkbookName, bookFile.Name);
-                          Set(varT001SavingEnvironment, DataCardValue2.Selected.Value);
+                          Set(varT001SavingEnvironment, envS01ValueBridge.Selected.Value);
                           Set(varT001SavingServer, DataCardValue3.Selected.Value);
                           SubmitForm(Form1),
                           Notify("受付には.txtログ1件と.xlsx更新対象一覧1冊、環境、サーバーが必要です", NotificationType.Error)
                       )
                   ),
                   Notify("保存中または保存済みの件があります。進捗一覧で確認してください", NotificationType.Warning)
-              )
+              ),
+              Set(varS01FlowStatus, "選択した環境・サーバーを使用できません。登録内容を読み直し、環境とサーバーを選び直してください。"))
             Text: ="照合を開始"
             Width: =170
             X: =25
             Y: =If(Parent.Width < 720, Parent.Height - 72, frmS01OneExcel.Y + frmS01OneExcel.Height + 16)
       - lblT001MqMode:
-          Control: Label@2.5.1
+          Control: Label
           Properties:
             Color: =RGBA(42, 57, 75, 1)
             Height: =If(IsBlank(Self.Text), 0, If(App.Width < 720, 52, 28))
@@ -921,25 +1004,28 @@ Screens:
             X: =25
             Y: =52
       - btnS01Progress:
-          Control: Button@0.0.45
+          Control: Button
           Properties:
-            AccessibleLabel: ="進捗一覧へ"
+            AccessibleLabel: ="進捗一覧に戻る"
             Appearance: ='ButtonCanvas.Appearance'.Secondary
-            Height: =40
+            Height: =36
             OnSelect: =Navigate(Screen2, ScreenTransition.None)
-            Text: ="進捗一覧へ"
-            Width: =150
-            X: =Parent.Width - 180
-            Y: =12
+            Text: ="進捗一覧に戻る"
+            Width: =192
+            X: =24
+            Y: =18
       - btnS01StartFlow:
-          Control: Button@0.0.45
+          Control: Button
           Properties:
             AccessibleLabel: ="処理開始"
             Appearance: ='ButtonCanvas.Appearance'.Primary
             DisplayMode: =DisplayMode.Disabled
             Height: =44
             OnSelect: |-
-              =If(
+              =Set(varS01SettingsReadOk, true);
+              IfError(Refresh('架空ログ転記先'), Set(varS01SettingsReadOk, false));
+              If(varS01SettingsReadOk && CountRows(Filter('架空ログ転記先', cr6cb_environment = envS01ValueBridge.Selected.Value && cr6cb_server = DataCardValue3.Selected.Value && cr6cb_isactive = '有効 (架空ログ転記先)'.有効 && (cr6cb_environmentenabled = Blank() || cr6cb_environmentenabled = '環境の使用状態 (架空ログ転記先)'.使用中))) = 1,
+              If(
                 !varT001Saving && !Coalesce(varT001SaveUnknown, false) && !Coalesce(varS01Starting, false) && !Coalesce(varS01StartUnknown, false) &&
                 !IsBlank(varT001Saved.架空ログ証跡件) && varT001Saved.処理状態 = "保存済み",
                 Set(varS01Starting, true);
@@ -976,14 +1062,15 @@ Screens:
                   )
                 ),
                 Notify("保存済みの未開始件がありません", NotificationType.Warning)
-              )
+              ),
+              Set(varS01FlowStatus, "選択した環境・サーバーを使用できません。登録内容を読み直し、環境とサーバーを選び直してください。"))
             Text: ="処理開始"
             Visible: =false
             Width: =170
             X: =Parent.Width - 195
             Y: =Parent.Height - 72
       - lblS01FlowStatus:
-          Control: Label@2.5.1
+          Control: Label
           Properties:
             Color: =RGBA(120, 75, 0, 1)
             Height: =60
@@ -1000,3 +1087,71 @@ Screens:
             Width: =Parent.Width - 50
             X: =25
             Y: =If(Parent.Width < 720, Parent.Height - 136, btnT001Save.Y + btnT001Save.Height + 8)
+      - envS01CloseMenu:
+          Control: Classic/Button
+          Properties:
+            BorderThickness: =0
+            Color: =RGBA(0, 0, 0, 0)
+            Fill: =RGBA(0, 0, 0, 0)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Normal
+            Height: =Parent.Height
+            HoverColor: =RGBA(0, 0, 0, 0)
+            HoverFill: =RGBA(0, 0, 0, 0)
+            OnSelect: =Set(varS01EnvOpen, false)
+            PressedColor: =RGBA(0, 0, 0, 0)
+            PressedFill: =RGBA(0, 0, 0, 0)
+            RadiusBottomLeft: =0
+            RadiusBottomRight: =0
+            RadiusTopLeft: =0
+            RadiusTopRight: =0
+            Size: =13
+            TabIndex: =-1
+            Text: =""
+            Tooltip: ="環境の候補を閉じる"
+            Visible: =Coalesce(varS01EnvOpen, false) && envS01ValueBridge.DisplayMode = DisplayMode.Edit
+            Width: =Parent.Width
+      - envS01Menu:
+          Control: Gallery
+          Variant: Vertical
+          Properties:
+            AccessibleLabel: ="環境の候補"
+            BorderColor: =RGBA(16, 110, 190, 1)
+            BorderThickness: =1
+            Default: =envS01ValueBridge.Selected
+            Fill: =RGBA(255, 255, 255, 1)
+            Height: =Max(44, Min(CountRows(Sort(Filter(AddColumns(Distinct(Filter('架空ログ転記先', cr6cb_isactive = '有効 (架空ログ転記先)'.有効 && (cr6cb_environmentenabled = Blank() || cr6cb_environmentenabled = '環境の使用状態 (架空ログ転記先)'.使用中)), cr6cb_environment), DisplayName, Substitute(Value, "架空", "")), DisplayName <> "環境長文"), DisplayName)) * 44, Parent.Height - Self.Y - 16))
+            Items: =Sort(Filter(AddColumns(Distinct(Filter('架空ログ転記先', cr6cb_isactive = '有効 (架空ログ転記先)'.有効 && (cr6cb_environmentenabled = Blank() || cr6cb_environmentenabled = '環境の使用状態 (架空ログ転記先)'.使用中)), cr6cb_environment), DisplayName, Substitute(Value, "架空", "")), DisplayName <> "環境長文"), DisplayName)
+            OnSelect: =Set(varS01EnvChoice, ThisItem.Value); Set(varS01EnvOpen, false); Set(varS01ServerReset, true); Set(varS01ServerReset, false)
+            TemplatePadding: =0
+            TemplateSize: =44
+            Visible: =Coalesce(varS01EnvOpen, false) && envS01ValueBridge.DisplayMode = DisplayMode.Edit
+            Width: =envS01ValueBridge.Width
+            X: =Form1.X + '環境名_DataCard1'.X + envS01ValueBridge.X
+            Y: =Form1.Y + '環境名_DataCard1'.Y + envS01ValueBridge.Y + envS01ValueBridge.Height
+          Children:
+            - envS01Option:
+                Control: Classic/Button
+                Properties:
+                  Align: =Align.Left
+                  BorderThickness: =0
+                  Color: =RGBA(42, 57, 75, 1)
+                  Fill: =If(ThisItem.Value = envS01ValueBridge.Selected.Value, RGBA(232, 242, 252, 1), RGBA(255, 255, 255, 1))
+                  Font: =Font.'Segoe UI'
+                  FontWeight: =FontWeight.Normal
+                  Height: =44
+                  HoverColor: =RGBA(255, 255, 255, 1)
+                  HoverFill: =RGBA(16, 110, 190, 1)
+                  OnSelect: =Set(varS01EnvChoice, ThisItem.Value); Set(varS01EnvOpen, false); Set(varS01ServerReset, true); Set(varS01ServerReset, false)
+                  PaddingLeft: =8
+                  PressedColor: =RGBA(255, 255, 255, 1)
+                  PressedFill: =RGBA(16, 110, 190, 1)
+                  RadiusBottomLeft: =0
+                  RadiusBottomRight: =0
+                  RadiusTopLeft: =0
+                  RadiusTopRight: =0
+                  Size: =13
+                  Text: =ThisItem.DisplayName
+                  Tooltip: ="環境 " & ThisItem.DisplayName
+                  Width: =Parent.TemplateWidth - 2
+                  X: =1

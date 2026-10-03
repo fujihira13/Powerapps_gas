@@ -27,8 +27,8 @@ Screens:
               =Set(varS01NewIntakeRequested, true);
               Navigate(Screen1, ScreenTransition.None)
             Text: ="照合するファイルを選ぶ"
-            Width: =If(Parent.Width < 640, Parent.Width - 48, 240)
-            X: =If(Parent.Width < 640, 24, (Parent.Width - Min(Parent.Width - 48, 1200)) / 2)
+            Width: =If(Parent.Width < 760, Parent.Width - 48, 240)
+            X: =If(Parent.Width < 760, 24, (Parent.Width - Min(Parent.Width - 48, 1200)) / 2)
             Y: =82
       - btnS02ArchiveToggle:
           Control: Button
@@ -38,9 +38,20 @@ Screens:
             Height: =42
             OnSelect: =Set(varS02ShowArchived, !varS02ShowArchived); Set(varS02ArchiveChoice, If(varS02ShowArchived, '保管済み (架空ログ証跡件)'.保管済み, '保管済み (架空ログ証跡件)'.通常))
             Text: =If(varS02ShowArchived, "進捗一覧に戻る", "完了した履歴を見る")
-            Width: =If(Parent.Width < 640, Parent.Width - 48, 180)
-            X: =If(Parent.Width < 640, 24, btnS02NewIntake.X + btnS02NewIntake.Width + 12)
-            Y: =If(Parent.Width < 640, 130, 82)
+            Width: =If(Parent.Width < 760, Parent.Width - 48, 180)
+            X: =If(Parent.Width < 760, 24, btnS02NewIntake.X + btnS02NewIntake.Width + 12)
+            Y: =If(Parent.Width < 760, 130, 82)
+      - btnS02Management:
+          Control: Button
+          Properties:
+            AccessibleLabel: ="環境・サーバーを管理"
+            Appearance: ='ButtonCanvas.Appearance'.Secondary
+            Height: =42
+            OnSelect: =Navigate(Screen5, ScreenTransition.None)
+            Text: ="環境・サーバーを管理"
+            Width: =If(Parent.Width < 760, Parent.Width - 48, 240)
+            X: =If(Parent.Width < 760, 24, btnS02ArchiveToggle.X + btnS02ArchiveToggle.Width + 12)
+            Y: =If(Parent.Width < 760, 178, 82)
       - tmrS02Refresh:
           Control: Timer
           Properties:
@@ -59,15 +70,15 @@ Screens:
             Visible: =false
       - galS02Cases:
           Control: Gallery
-          Variant: Vertical
+          Variant: VariableHeight
           Properties:
             AccessibleLabel: ="処理状況の一覧"
-            Height: =If(Parent.Width < 640, Parent.Height - 200, Parent.Height - 152)
+            Height: =Max(80, Parent.Height - Self.Y - 16)
             Items: =If(varS02ShowArchived, SortByColumns(Filter('架空ログ証跡件', 保管済み = '保管済み (架空ログ証跡件)'.保管済み), "modifiedon", SortOrder.Descending), SortByColumns(Filter('架空ログ証跡件', 保管済み <> '保管済み (架空ログ証跡件)'.保管済み), "modifiedon", SortOrder.Descending))
             TemplateSize: =If(Parent.Width >= 900, 292, 540)
             Width: =Min(Parent.Width - 48, 1200)
             X: =(Parent.Width - Self.Width) / 2
-            Y: =If(Parent.Width < 640, 180, 138)
+            Y: =If(Parent.Width < 760, 226, 138)
           Children:
             - lblS02Status:
                 Control: Label
@@ -84,6 +95,7 @@ Screens:
             - lblS02Identity:
                 Control: Label
                 Properties:
+                  AutoHeight: =true
                   Color: =RGBA(25, 54, 92, 1)
                   Font: =Font.'Segoe UI'
                   FontWeight: =FontWeight.Semibold
@@ -151,13 +163,12 @@ Screens:
                 Properties:
                   Color: =RGBA(42, 57, 75, 1)
                   Font: =Font.'Segoe UI'
-                  Height: =84
+                  Height: =58
                   Text: |-
                     =With(
                       {canShowHumanDecision: ThisItem.処理状態 = "転記済み" && ThisItem.Excel反映確認 = "全文一致"},
-                      "担当者の確認: " & If(canShowHumanDecision, Coalesce(ThisItem.転記照合, "未記録"), "照合後に確認") &
-                      Char(10) & "処理結果の判断: " & If(canShowHumanDecision, Coalesce(ThisItem.処理結果判断, "未記録"), "照合後に確認") &
-                      Char(10) & "レビュー: " & If(IsBlank(ThisItem.レビュー状態) || ThisItem.レビュー状態 = "未依頼", "依頼前", ThisItem.レビュー状態)
+                      "担当者の判断: " & If(canShowHumanDecision, Switch(ThisItem.処理結果判断, "正常", "問題なし", "異常", "要対応", "判断保留", "判断保留", Coalesce(ThisItem.処理結果判断, "未記録")), "未記録") &
+                      Char(10) & "レビュー: " & Switch(ThisItem.レビュー状態, "依頼中", "レビュー待ち", "再依頼", "レビュー待ち", "確認済み", "レビュー完了", "差し戻し", "差し戻し", Coalesce(ThisItem.レビュー状態, "未依頼"))
                     )
                   Width: =If(Parent.TemplateWidth >= 900, Parent.TemplateWidth * 0.43 - 48, Parent.TemplateWidth - 48)
                   X: =If(Parent.TemplateWidth >= 900, Parent.TemplateWidth * 0.57, 24)
@@ -165,6 +176,7 @@ Screens:
             - lblS02MqSummary:
                 Control: Label
                 Properties:
+                  AutoHeight: =true
                   Color: =RGBA(42, 57, 75, 1)
                   Font: =Font.'Segoe UI'
                   Height: =48
@@ -178,7 +190,7 @@ Screens:
                         ThisItem.処理状態 = "開始受付済み" || ThisItem.処理状態 = "処理中",
                         "照合結果: 照合中",
                         ThisItem.処理状態 = "停止" || ThisItem.処理状態 = "結果不明",
-                        "照合できません: " & Coalesce(ThisItem.停止理由, "処理状態を確認してください"),
+                        "照合できません",
                         If(
                         (CountIf('件別ファイル', 対象件.架空ログ証跡件 = ThisItem.架空ログ証跡件 && ファイル種別 = "log") = 1 &&
                         CountIf('件別ファイル', 対象件.架空ログ証跡件 = ThisItem.架空ログ証跡件 && ファイル種別 = "excel") = 1) ||
@@ -222,23 +234,11 @@ Screens:
                   AccessibleLabel: ="ログと結果を見る"
                   Appearance: ='ButtonCanvas.Appearance'.Primary
                   Height: =42
-                  OnSelect: =Set(varEvidenceCase, ThisItem); Navigate(Screen3, ScreenTransition.None)
+                  OnSelect: =Set(varEvidenceCase, ThisItem); Set(varDemoRole, "担当者役"); Navigate(Screen3, ScreenTransition.None)
                   Text: ="ログと結果を見る"
                   Width: =If(Parent.Width >= 900, 176, 160)
                   X: =If(Parent.TemplateWidth >= 900, Parent.TemplateWidth * 0.57, 24)
-                  Y: =If(Parent.TemplateWidth >= 900, 238, If(!IsBlank(ThisItem.停止理由), lblS02Failure.Y + lblS02Failure.Height + 8, lblS02HumanChecks.Y + lblS02HumanChecks.Height + 8))
-            - btnS02OpenReview:
-                Control: Button
-                Properties:
-                  AccessibleLabel: ="レビューを確認"
-                  Appearance: ='ButtonCanvas.Appearance'.Secondary
-                  DisplayMode: =If(ThisItem.処理状態 = "転記済み" && ThisItem.Excel反映確認 = "全文一致" && (ThisItem.レビュー状態 = "依頼中" || ThisItem.レビュー状態 = "再依頼" || ThisItem.レビュー状態 = "差し戻し" || ThisItem.レビュー状態 = "確認済み"), DisplayMode.Edit, DisplayMode.Disabled)
-                  Height: =42
-                  OnSelect: =If(ThisItem.処理状態 = "転記済み" && ThisItem.Excel反映確認 = "全文一致" && (ThisItem.レビュー状態 = "依頼中" || ThisItem.レビュー状態 = "再依頼" || ThisItem.レビュー状態 = "差し戻し" || ThisItem.レビュー状態 = "確認済み"), Set(varEvidenceCase, ThisItem); Set(varDemoRole, "担当者役"); Navigate(Screen4, ScreenTransition.None))
-                  Text: ="レビューを確認"
-                  Width: =If(Parent.Width >= 900, 170, 138)
-                  X: =If(Parent.TemplateWidth >= 900, btnS02OpenCase.X + btnS02OpenCase.Width + 12, btnS02OpenCase.X + btnS02OpenCase.Width + 12)
-                  Y: =btnS02OpenCase.Y
+                  Y: =Max(If(Parent.TemplateWidth >= 900, 238, lblS02HumanChecks.Y + lblS02HumanChecks.Height + 8), If(!IsBlank(ThisItem.停止理由), lblS02Failure.Y + lblS02Failure.Height + 8, 0))
             - btnS02Archive:
                 Control: Button
                 Properties:
@@ -256,7 +256,7 @@ Screens:
                           Set(varS02ArchiveSavedId, savedCase.架空ログ証跡件);
                           With(
                             {confirmedCase: LookUp('架空ログ証跡件', 架空ログ証跡件 = varS02ArchiveSavedId)},
-                            If(confirmedCase.保管済み = savedCase.保管済み, Notify("表示を切り替えました。", NotificationType.Success), Notify("保管状態を確認できません。", NotificationType.Error))
+                            If(confirmedCase.保管済み = savedCase.保管済み, Blank(), Notify("保管状態を確認できません。", NotificationType.Error))
                           ),
                           Notify("保管状態を保存できませんでした。", NotificationType.Error)
                         )
@@ -266,7 +266,7 @@ Screens:
                   Visible: =ThisItem.レビュー状態 = "確認済み"
                   Width: =160
                   X: =If(Parent.TemplateWidth >= 900, 24, 24)
-                  Y: =If(Parent.TemplateWidth >= 900, 238, btnS02OpenCase.Y + btnS02OpenCase.Height + 8)
+                  Y: =If(Parent.TemplateWidth >= 900, btnS02OpenCase.Y, btnS02OpenCase.Y + btnS02OpenCase.Height + 8)
             - btnS02BackIntake:
                 Control: Button
                 Properties:

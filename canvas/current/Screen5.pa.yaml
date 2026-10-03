@@ -1,0 +1,890 @@
+Screens:
+  Screen5:
+    Properties:
+      Fill: =RGBA(243, 246, 250, 1)
+      OnVisible: =Set(varM06Busy, false); Set(varM06Unknown, false); Set(varM06Ready, false); Set(varM06Dialog, ""); Set(varM06Error, ""); Set(varM06ServerActive, true); Set(varM06EnvActive, true); Select(btnM06Reload)
+    Children:
+      - grdM06Scroll:
+          Control: FluidGrid
+          Properties:
+            BorderThickness: =0
+            Height: =Parent.Height
+            Width: =Parent.Width
+          Children:
+            - crdM06ScrollBody:
+                Control: DataCard
+                Variant: BlankCard
+                Properties:
+                  Height: =conM06Center.Height
+                  Width: =Parent.Width
+                  X: =0
+                  Y: =0
+                Children:
+                  - conM06Center:
+                      Control: GroupContainer
+                      Variant: ManualLayout
+                      Properties:
+                        DropShadow: =DropShadow.None
+                        Height: =Max(Screen5.Height, pnlM06Lists.Y + pnlM06Lists.Height + 24)
+                        Width: =Min(Parent.Width - 48, 1200)
+                        X: =(Parent.Width - Self.Width) / 2
+                      Children:
+                        - btnM06Back:
+                            Control: Classic/Button
+                            Properties:
+                              BorderColor: =RGBA(208, 220, 234, 1)
+                              BorderThickness: =1
+                              Color: =RGBA(25, 54, 92, 1)
+                              DisplayMode: =If(varM06Busy || varM06Unknown || !varM06Ready, DisplayMode.Disabled, DisplayMode.Edit)
+                              Fill: =RGBA(255, 255, 255, 1)
+                              Font: =Font.'Segoe UI'
+                              Height: =36
+                              HoverColor: =RGBA(255, 255, 255, 1)
+                              HoverFill: =RGBA(15, 108, 189, 1)
+                              OnSelect: =Navigate(Screen2, ScreenTransition.None)
+                              PressedColor: =RGBA(255, 255, 255, 1)
+                              PressedFill: =RGBA(9, 82, 144, 1)
+                              RadiusBottomLeft: =4
+                              RadiusBottomRight: =4
+                              RadiusTopLeft: =4
+                              RadiusTopRight: =4
+                              Size: =12
+                              Text: ="進捗一覧に戻る"
+                              Tooltip: ="進捗一覧に戻る"
+                              Width: =192
+                              Y: =18
+                        - lblM06Title:
+                            Control: Label
+                            Properties:
+                              Color: =RGBA(25, 54, 92, 1)
+                              Font: =Font.'Segoe UI'
+                              FontWeight: =FontWeight.Bold
+                              Height: =52
+                              Size: =If(Parent.Width < 450, 20, 24)
+                              Text: ="環境・サーバーの管理"
+                              Width: =Parent.Width
+                              Y: =70
+                        - lblM06Error:
+                            Control: Label
+                            Properties:
+                              AutoHeight: =true
+                              Color: =RGBA(163, 38, 45, 1)
+                              Font: =Font.'Segoe UI'
+                              Height: =48
+                              Size: =14
+                              Text: =varM06Error
+                              Visible: =!IsBlank(varM06Error) && IsBlank(varM06Dialog)
+                              Width: =Parent.Width
+                              Y: =126
+                        - btnM06Reload:
+                            Control: Classic/Button
+                            Properties:
+                              BorderColor: =RGBA(208, 220, 234, 1)
+                              BorderThickness: =1
+                              Color: =RGBA(25, 54, 92, 1)
+                              DisplayMode: =If(varM06Busy, DisplayMode.Disabled, DisplayMode.Edit)
+                              Fill: =RGBA(255, 255, 255, 1)
+                              Font: =Font.'Segoe UI'
+                              Height: =42
+                              HoverColor: =RGBA(255, 255, 255, 1)
+                              HoverFill: =RGBA(15, 108, 189, 1)
+                              OnSelect: |-
+                                =If(!varM06Busy,
+                                Set(varM06Busy, true); Set(varM06Error, ""); Set(varM06Op, "list");
+                                IfError(Set(varM06Reply, '架空ログ証跡_環境サーバー管理'.Run(JSON({operation: "list"}, JSONFormat.Compact)));
+                                Set(varM06Parsed, ParseJSON(varM06Reply.result));
+                                If(Boolean(varM06Parsed.ok),
+                                  ClearCollect(colM06Rows, ForAll(Table(varM06Parsed.rows) As saved, {
+                                    Id: Text(saved.Value.id), Version: Text(saved.Value.version),
+                                    Server: Text(saved.Value.server), Env: Text(saved.Value.environment),
+                                    ServerEnabled: Boolean(saved.Value.serverEnabled), EnvEnabled: Boolean(saved.Value.environmentEnabled)
+                                  }));
+                                  Set(varM06Unknown, false);
+                                  Set(varM06Error, "");
+                                  Set(varM06Dialog, "");
+                                  If(varM06Op = "renameServer" || varM06Op = "addServer", Set(varM06Server, varM06NewServer));
+                                  If(IsBlank(LookUp(colM06Rows, Server = varM06Server)), Set(varM06Server, First(Filter(colM06Rows, ServerEnabled)).Server));
+                                  Set(varM06Ready, true),
+                                  Set(varM06Error, Text(varM06Parsed.reason));
+                                  If(("読み直して" in varM06Error || "画面を開き直して" in varM06Error), Set(varM06Unknown, true))
+                                ),
+                                Set(varM06Error, "登録内容を読み取れません。読み直してから操作してください。"); Set(varM06Unknown, true));
+                                Set(varM06Busy, false))
+                              PressedColor: =RGBA(255, 255, 255, 1)
+                              PressedFill: =RGBA(9, 82, 144, 1)
+                              RadiusBottomLeft: =4
+                              RadiusBottomRight: =4
+                              RadiusTopLeft: =4
+                              RadiusTopRight: =4
+                              Size: =12
+                              Text: ="読み直す"
+                              Tooltip: ="読み直す"
+                              Visible: =!IsBlank(varM06Error) && IsBlank(varM06Dialog)
+                              Width: =120
+                              Y: =lblM06Error.Y + lblM06Error.Height + 6
+                        - pnlM06Lists:
+                            Control: GroupContainer
+                            Variant: ManualLayout
+                            Properties:
+                              DropShadow: =DropShadow.None
+                              Height: =If(Self.Width > 760, Max(srvM06Panel.Height, envM06Panel.Height), srvM06Panel.Height + envM06Panel.Height + 24)
+                              Width: =Parent.Width
+                              Y: =If(lblM06Error.Visible, btnM06Reload.Y + 58, 132)
+                            Children:
+                              - srvM06Panel:
+                                  Control: GroupContainer
+                                  Variant: ManualLayout
+                                  Properties:
+                                    BorderColor: =RGBA(208, 220, 234, 1)
+                                    BorderThickness: =1
+                                    DropShadow: =DropShadow.None
+                                    Fill: =RGBA(255, 255, 255, 1)
+                                    Height: =srvM06List.Y + srvM06List.Height + 18
+                                    Width: =If(Parent.Width > 760, (Parent.Width - 24) / 2, Parent.Width)
+                                  Children:
+                                    - srvM06Title:
+                                        Control: Label
+                                        Properties:
+                                          Color: =RGBA(25, 54, 92, 1)
+                                          Font: =Font.'Segoe UI'
+                                          FontWeight: =FontWeight.Bold
+                                          Height: =42
+                                          Size: =20
+                                          Text: ="サーバー"
+                                          Width: =Parent.Width - 180
+                                          X: =18
+                                          Y: =18
+                                    - srvM06Add:
+                                        Control: Classic/Button
+                                        Properties:
+                                          BorderColor: =RGBA(15, 108, 189, 1)
+                                          BorderThickness: =1
+                                          Color: =RGBA(255, 255, 255, 1)
+                                          DisplayMode: =If(varM06Busy || varM06Unknown || !varM06Ready, DisplayMode.Disabled, DisplayMode.Edit)
+                                          Fill: =RGBA(15, 108, 189, 1)
+                                          Font: =Font.'Segoe UI'
+                                          Height: =42
+                                          HoverColor: =RGBA(255, 255, 255, 1)
+                                          HoverFill: =RGBA(15, 108, 189, 1)
+                                          OnSelect: |-
+                                            =If(!varM06Busy && !varM06Unknown,
+                                            Set(varM06Op, "addServer"); Set(varM06Target, Blank());
+                                            Set(varM06OldServer, ""); Set(varM06OldEnv, "");
+                                            Set(varM06NewServer, varM06OldServer); Set(varM06NewEnv, varM06OldEnv);
+                                            Set(varM06Expected, ForAll(colM06Rows As proof, {id: proof.Id, version: proof.Version}));
+                                            Set(varM06Error, ""); Set(varM06Dialog, "edit");
+                                            Reset(txtM06Server); Reset(txtM06Env)
+                                            )
+                                          PressedColor: =RGBA(255, 255, 255, 1)
+                                          PressedFill: =RGBA(9, 82, 144, 1)
+                                          RadiusBottomLeft: =4
+                                          RadiusBottomRight: =4
+                                          RadiusTopLeft: =4
+                                          RadiusTopRight: =4
+                                          Size: =12
+                                          Text: ="サーバーを追加"
+                                          Tooltip: ="サーバーを追加"
+                                          Width: =150
+                                          X: =Parent.Width - 168
+                                          Y: =18
+                                    - srvM06TabActive:
+                                        Control: Classic/Button
+                                        Properties:
+                                          BorderColor: =RGBA(208, 220, 234, 1)
+                                          BorderThickness: =1
+                                          Color: =RGBA(25, 54, 92, 1)
+                                          DisplayMode: =If(varM06Busy || varM06Unknown || !varM06Ready, DisplayMode.Disabled, DisplayMode.Edit)
+                                          Fill: =If(varM06ServerActive, RGBA(232, 242, 253, 1), RGBA(255, 255, 255, 1))
+                                          Font: =Font.'Segoe UI'
+                                          FontWeight: =If(varM06ServerActive, FontWeight.Semibold, FontWeight.Normal)
+                                          Height: =42
+                                          HoverColor: =RGBA(255, 255, 255, 1)
+                                          HoverFill: =RGBA(15, 108, 189, 1)
+                                          OnSelect: =Set(varM06ServerActive, true)
+                                          PressedColor: =RGBA(255, 255, 255, 1)
+                                          PressedFill: =RGBA(9, 82, 144, 1)
+                                          RadiusBottomLeft: =4
+                                          RadiusBottomRight: =4
+                                          RadiusTopLeft: =4
+                                          RadiusTopRight: =4
+                                          Size: =12
+                                          Text: ="使用中のサーバー"
+                                          Tooltip: ="使用中のサーバー"
+                                          Width: =148
+                                          X: =18
+                                          Y: =74
+                                    - srvM06TabEnded:
+                                        Control: Classic/Button
+                                        Properties:
+                                          BorderColor: =RGBA(208, 220, 234, 1)
+                                          BorderThickness: =1
+                                          Color: =RGBA(25, 54, 92, 1)
+                                          DisplayMode: =If(varM06Busy || varM06Unknown || !varM06Ready, DisplayMode.Disabled, DisplayMode.Edit)
+                                          Fill: =If(!varM06ServerActive, RGBA(232, 242, 253, 1), RGBA(255, 255, 255, 1))
+                                          Font: =Font.'Segoe UI'
+                                          FontWeight: =If(!varM06ServerActive, FontWeight.Semibold, FontWeight.Normal)
+                                          Height: =42
+                                          HoverColor: =RGBA(255, 255, 255, 1)
+                                          HoverFill: =RGBA(15, 108, 189, 1)
+                                          OnSelect: =Set(varM06ServerActive, false)
+                                          PressedColor: =RGBA(255, 255, 255, 1)
+                                          PressedFill: =RGBA(9, 82, 144, 1)
+                                          RadiusBottomLeft: =4
+                                          RadiusBottomRight: =4
+                                          RadiusTopLeft: =4
+                                          RadiusTopRight: =4
+                                          Size: =12
+                                          Text: ="使用終了したサーバー"
+                                          Tooltip: ="使用終了したサーバー"
+                                          Width: =180
+                                          X: =If(Parent.Width < 390, 18, 178)
+                                          Y: =74 + If(Parent.Width < 390, 48, 0)
+                                    - srvM06List:
+                                        Control: Gallery
+                                        Variant: Vertical
+                                        Properties:
+                                          AccessibleLabel: ="サーバー一覧"
+                                          DelayItemLoading: =false
+                                          Height: =Max(48, CountRows(SortByColumns(DropColumns(GroupBy(Filter(colM06Rows, ServerEnabled = varM06ServerActive), Server, Members), Members), "Server", SortOrder.Ascending)) * (Self.TemplateHeight + Self.TemplatePadding) + Self.TemplatePadding)
+                                          Items: =SortByColumns(DropColumns(GroupBy(Filter(colM06Rows, ServerEnabled = varM06ServerActive), Server, Members), Members), "Server", SortOrder.Ascending)
+                                          Selectable: =false
+                                          ShowScrollbar: =false
+                                          TemplatePadding: =12
+                                          TemplateSize: =Max(128, RoundUp(Max(1, Max(SortByColumns(DropColumns(GroupBy(Filter(colM06Rows, ServerEnabled = varM06ServerActive), Server, Members), Members), "Server", SortOrder.Ascending), Len(Server))) * 18 / Max(80, Self.Width - 190), 0) * 26 + If(Self.Width < 310, 136, 82))
+                                          Width: =Parent.Width - 36
+                                          X: =18
+                                          Y: =132 + If(Parent.Width < 390, 48, 0)
+                                        Children:
+                                          - srvM06Card:
+                                              Control: Rectangle
+                                              Properties:
+                                                BorderColor: =RGBA(208, 220, 234, 1)
+                                                BorderThickness: =1
+                                                Fill: =RGBA(255, 255, 255, 1)
+                                                Height: =srvM06Toggle.Y + 56
+                                                Width: =Parent.TemplateWidth - 2
+                                          - srvM06Name:
+                                              Control: Label
+                                              Properties:
+                                                Color: =RGBA(25, 54, 92, 1)
+                                                Font: =Font.'Segoe UI'
+                                                FontWeight: =FontWeight.Semibold
+                                                Height: =Max(36, RoundUp(Len(ThisItem.Server) * 18 / Max(1, Self.Width), 0) * 26)
+                                                Size: =14
+                                                Text: =ThisItem.Server
+                                                Width: =Max(80, Parent.TemplateWidth - 190)
+                                                X: =14
+                                                Y: =14
+                                          - btnM06ViewEnvironments:
+                                              Control: Classic/Button
+                                              Properties:
+                                                BorderColor: =RGBA(208, 220, 234, 1)
+                                                BorderThickness: =1
+                                                Color: =RGBA(25, 54, 92, 1)
+                                                DisplayMode: =If(varM06Busy || varM06Unknown || !varM06Ready, DisplayMode.Disabled, DisplayMode.Edit)
+                                                Fill: =RGBA(255, 255, 255, 1)
+                                                Font: =Font.'Segoe UI'
+                                                Height: =42
+                                                HoverColor: =RGBA(255, 255, 255, 1)
+                                                HoverFill: =RGBA(15, 108, 189, 1)
+                                                OnSelect: =Set(varM06Server, ThisItem.Server); Set(varM06EnvActive, true); SetFocus(lblM06ServerContext)
+                                                PressedColor: =RGBA(255, 255, 255, 1)
+                                                PressedFill: =RGBA(9, 82, 144, 1)
+                                                RadiusBottomLeft: =4
+                                                RadiusBottomRight: =4
+                                                RadiusTopLeft: =4
+                                                RadiusTopRight: =4
+                                                Size: =12
+                                                Text: ="環境を見る"
+                                                Tooltip: ="環境を見る"
+                                                Width: =148
+                                                X: =Parent.TemplateWidth - 162
+                                                Y: =14
+                                          - srvM06Rename:
+                                              Control: Classic/Button
+                                              Properties:
+                                                BorderColor: =RGBA(208, 220, 234, 1)
+                                                BorderThickness: =1
+                                                Color: =RGBA(25, 54, 92, 1)
+                                                DisplayMode: =If(varM06Busy || varM06Unknown || !varM06Ready, DisplayMode.Disabled, DisplayMode.Edit)
+                                                Fill: =RGBA(255, 255, 255, 1)
+                                                Font: =Font.'Segoe UI'
+                                                Height: =42
+                                                HoverColor: =RGBA(255, 255, 255, 1)
+                                                HoverFill: =RGBA(15, 108, 189, 1)
+                                                OnSelect: |-
+                                                  =If(!varM06Busy && !varM06Unknown,
+                                                  Set(varM06Op, "renameServer"); Set(varM06Target, First(Filter(colM06Rows, Server = ThisItem.Server)).Id);
+                                                  Set(varM06OldServer, ThisItem.Server); Set(varM06OldEnv, "");
+                                                  Set(varM06NewServer, varM06OldServer); Set(varM06NewEnv, varM06OldEnv);
+                                                  Set(varM06Expected, ForAll(Filter(colM06Rows, Server = varM06OldServer) As proof, {id: proof.Id, version: proof.Version}));
+                                                  Set(varM06Error, ""); Set(varM06Dialog, "edit");
+                                                  Reset(txtM06Server); Reset(txtM06Env)
+                                                  )
+                                                PressedColor: =RGBA(255, 255, 255, 1)
+                                                PressedFill: =RGBA(9, 82, 144, 1)
+                                                RadiusBottomLeft: =4
+                                                RadiusBottomRight: =4
+                                                RadiusTopLeft: =4
+                                                RadiusTopRight: =4
+                                                Size: =12
+                                                Text: ="名称を変更"
+                                                Tooltip: ="名称を変更"
+                                                Width: =116
+                                                X: =14
+                                                Y: =srvM06Name.Y + srvM06Name.Height + 12
+                                          - srvM06Toggle:
+                                              Control: Classic/Button
+                                              Properties:
+                                                BorderColor: =RGBA(208, 220, 234, 1)
+                                                BorderThickness: =1
+                                                Color: =RGBA(25, 54, 92, 1)
+                                                DisplayMode: =If(varM06Busy || varM06Unknown || !varM06Ready, DisplayMode.Disabled, DisplayMode.Edit)
+                                                Fill: =RGBA(255, 255, 255, 1)
+                                                Font: =Font.'Segoe UI'
+                                                Height: =42
+                                                HoverColor: =RGBA(255, 255, 255, 1)
+                                                HoverFill: =RGBA(15, 108, 189, 1)
+                                                OnSelect: |-
+                                                  =If(!varM06Busy && !varM06Unknown,
+                                                  Set(varM06Op, If(varM06ServerActive, "endServer", "reactivateServer")); Set(varM06Target, First(Filter(colM06Rows, Server = ThisItem.Server)).Id);
+                                                  Set(varM06OldServer, ThisItem.Server); Set(varM06OldEnv, "");
+                                                  Set(varM06NewServer, varM06OldServer); Set(varM06NewEnv, varM06OldEnv);
+                                                  Set(varM06Expected, ForAll(Filter(colM06Rows, Server = varM06OldServer) As proof, {id: proof.Id, version: proof.Version}));
+                                                  Set(varM06Error, ""); Set(varM06Dialog, "confirm");
+                                                  Reset(txtM06Server); Reset(txtM06Env)
+                                                  )
+                                                PressedColor: =RGBA(255, 255, 255, 1)
+                                                PressedFill: =RGBA(9, 82, 144, 1)
+                                                RadiusBottomLeft: =4
+                                                RadiusBottomRight: =4
+                                                RadiusTopLeft: =4
+                                                RadiusTopRight: =4
+                                                Size: =12
+                                                Text: =If(varM06ServerActive, "使用を終了", "再び使用する")
+                                                Tooltip: =If(varM06ServerActive, "使用を終了", "再び使用する")
+                                                Width: =144
+                                                X: =If(Parent.TemplateWidth < 310, 14, 142)
+                                                Y: =srvM06Name.Y + srvM06Name.Height + If(Parent.TemplateWidth < 310, 66, 12)
+                                    - srvM06Empty:
+                                        Control: Label
+                                        Properties:
+                                          Color: =RGBA(25, 54, 92, 1)
+                                          Font: =Font.'Segoe UI'
+                                          Height: =48
+                                          Size: =14
+                                          Text: ="該当するサーバーはありません。"
+                                          Visible: =CountRows(SortByColumns(DropColumns(GroupBy(Filter(colM06Rows, ServerEnabled = varM06ServerActive), Server, Members), Members), "Server", SortOrder.Ascending)) = 0
+                                          Width: =Parent.Width - 36
+                                          X: =18
+                                          Y: =srvM06List.Y
+                              - envM06Panel:
+                                  Control: GroupContainer
+                                  Variant: ManualLayout
+                                  Properties:
+                                    BorderColor: =RGBA(208, 220, 234, 1)
+                                    BorderThickness: =1
+                                    DropShadow: =DropShadow.None
+                                    Fill: =RGBA(255, 255, 255, 1)
+                                    Height: =envM06List.Y + envM06List.Height + 18
+                                    Width: =If(Parent.Width > 760, (Parent.Width - 24) / 2, Parent.Width)
+                                    X: =If(Parent.Width > 760, (Parent.Width + 24) / 2, 0)
+                                    Y: =If(Parent.Width > 760, 0, srvM06Panel.Height + 24)
+                                  Children:
+                                    - envM06Add:
+                                        Control: Classic/Button
+                                        Properties:
+                                          BorderColor: =RGBA(15, 108, 189, 1)
+                                          BorderThickness: =1
+                                          Color: =RGBA(255, 255, 255, 1)
+                                          DisplayMode: =If(varM06Busy || varM06Unknown || !Coalesce(LookUp(colM06Rows, Server = varM06Server).ServerEnabled, false), DisplayMode.Disabled, DisplayMode.Edit)
+                                          Fill: =RGBA(15, 108, 189, 1)
+                                          Font: =Font.'Segoe UI'
+                                          Height: =42
+                                          HoverColor: =RGBA(255, 255, 255, 1)
+                                          HoverFill: =RGBA(15, 108, 189, 1)
+                                          OnSelect: |-
+                                            =If(!varM06Busy && !varM06Unknown,
+                                            Set(varM06Op, "addEnvironment"); Set(varM06Target, First(Filter(colM06Rows, Server = varM06Server)).Id);
+                                            Set(varM06OldServer, varM06Server); Set(varM06OldEnv, "");
+                                            Set(varM06NewServer, varM06OldServer); Set(varM06NewEnv, varM06OldEnv);
+                                            Set(varM06Expected, ForAll(Filter(colM06Rows, Server = varM06OldServer) As proof, {id: proof.Id, version: proof.Version}));
+                                            Set(varM06Error, ""); Set(varM06Dialog, "edit");
+                                            Reset(txtM06Server); Reset(txtM06Env)
+                                            )
+                                          PressedColor: =RGBA(255, 255, 255, 1)
+                                          PressedFill: =RGBA(9, 82, 144, 1)
+                                          RadiusBottomLeft: =4
+                                          RadiusBottomRight: =4
+                                          RadiusTopLeft: =4
+                                          RadiusTopRight: =4
+                                          Size: =12
+                                          Text: ="環境を追加"
+                                          Tooltip: ="環境を追加"
+                                          Width: =150
+                                          X: =Parent.Width - 168
+                                          Y: =18
+                                    - envM06TabActive:
+                                        Control: Classic/Button
+                                        Properties:
+                                          BorderColor: =RGBA(208, 220, 234, 1)
+                                          BorderThickness: =1
+                                          Color: =RGBA(25, 54, 92, 1)
+                                          DisplayMode: =If(varM06Busy || varM06Unknown || !varM06Ready, DisplayMode.Disabled, DisplayMode.Edit)
+                                          Fill: =If(varM06EnvActive, RGBA(232, 242, 253, 1), RGBA(255, 255, 255, 1))
+                                          Font: =Font.'Segoe UI'
+                                          FontWeight: =If(varM06EnvActive, FontWeight.Semibold, FontWeight.Normal)
+                                          Height: =42
+                                          HoverColor: =RGBA(255, 255, 255, 1)
+                                          HoverFill: =RGBA(15, 108, 189, 1)
+                                          OnSelect: =Set(varM06EnvActive, true)
+                                          PressedColor: =RGBA(255, 255, 255, 1)
+                                          PressedFill: =RGBA(9, 82, 144, 1)
+                                          RadiusBottomLeft: =4
+                                          RadiusBottomRight: =4
+                                          RadiusTopLeft: =4
+                                          RadiusTopRight: =4
+                                          Size: =12
+                                          Text: ="使用中の環境"
+                                          Tooltip: ="使用中の環境"
+                                          Width: =148
+                                          X: =18
+                                          Y: =74 + Max(0, lblM06ServerContext.Height - 42)
+                                    - envM06TabEnded:
+                                        Control: Classic/Button
+                                        Properties:
+                                          BorderColor: =RGBA(208, 220, 234, 1)
+                                          BorderThickness: =1
+                                          Color: =RGBA(25, 54, 92, 1)
+                                          DisplayMode: =If(varM06Busy || varM06Unknown || !varM06Ready, DisplayMode.Disabled, DisplayMode.Edit)
+                                          Fill: =If(!varM06EnvActive, RGBA(232, 242, 253, 1), RGBA(255, 255, 255, 1))
+                                          Font: =Font.'Segoe UI'
+                                          FontWeight: =If(!varM06EnvActive, FontWeight.Semibold, FontWeight.Normal)
+                                          Height: =42
+                                          HoverColor: =RGBA(255, 255, 255, 1)
+                                          HoverFill: =RGBA(15, 108, 189, 1)
+                                          OnSelect: =Set(varM06EnvActive, false)
+                                          PressedColor: =RGBA(255, 255, 255, 1)
+                                          PressedFill: =RGBA(9, 82, 144, 1)
+                                          RadiusBottomLeft: =4
+                                          RadiusBottomRight: =4
+                                          RadiusTopLeft: =4
+                                          RadiusTopRight: =4
+                                          Size: =12
+                                          Text: ="使用終了した環境"
+                                          Tooltip: ="使用終了した環境"
+                                          Width: =180
+                                          X: =If(Parent.Width < 390, 18, 178)
+                                          Y: =74 + If(Parent.Width < 390, 48, 0) + Max(0, lblM06ServerContext.Height - 42)
+                                    - envM06List:
+                                        Control: Gallery
+                                        Variant: Vertical
+                                        Properties:
+                                          AccessibleLabel: ="環境一覧"
+                                          DelayItemLoading: =false
+                                          Height: =Max(48, CountRows(SortByColumns(Filter(colM06Rows, Server = varM06Server && EnvEnabled = varM06EnvActive), "Env", SortOrder.Ascending)) * (Self.TemplateHeight + Self.TemplatePadding) + Self.TemplatePadding)
+                                          Items: =SortByColumns(Filter(colM06Rows, Server = varM06Server && EnvEnabled = varM06EnvActive), "Env", SortOrder.Ascending)
+                                          Selectable: =false
+                                          ShowScrollbar: =false
+                                          TemplatePadding: =12
+                                          TemplateSize: =Max(128, RoundUp(Max(1, Max(SortByColumns(Filter(colM06Rows, Server = varM06Server && EnvEnabled = varM06EnvActive), "Env", SortOrder.Ascending), Len(Env))) * 18 / Max(80, Self.Width - 28), 0) * 26 + If(Self.Width < 310, 136, 82))
+                                          Width: =Parent.Width - 36
+                                          X: =18
+                                          Y: =132 + If(Parent.Width < 390, 48, 0) + Max(0, lblM06ServerContext.Height - 42)
+                                        Children:
+                                          - envM06Card:
+                                              Control: Rectangle
+                                              Properties:
+                                                BorderColor: =RGBA(208, 220, 234, 1)
+                                                BorderThickness: =1
+                                                Fill: =RGBA(255, 255, 255, 1)
+                                                Height: =envM06Toggle.Y + 56
+                                                Width: =Parent.TemplateWidth - 2
+                                          - envM06Name:
+                                              Control: Label
+                                              Properties:
+                                                Color: =RGBA(25, 54, 92, 1)
+                                                Font: =Font.'Segoe UI'
+                                                FontWeight: =FontWeight.Semibold
+                                                Height: =Max(36, RoundUp(Len(ThisItem.Env) * 18 / Max(1, Self.Width), 0) * 26)
+                                                Size: =14
+                                                Text: =ThisItem.Env
+                                                Width: =Parent.TemplateWidth - 28
+                                                X: =14
+                                                Y: =14
+                                          - envM06Rename:
+                                              Control: Classic/Button
+                                              Properties:
+                                                BorderColor: =RGBA(208, 220, 234, 1)
+                                                BorderThickness: =1
+                                                Color: =RGBA(25, 54, 92, 1)
+                                                DisplayMode: =If(varM06Busy || varM06Unknown || !varM06Ready, DisplayMode.Disabled, DisplayMode.Edit)
+                                                Fill: =RGBA(255, 255, 255, 1)
+                                                Font: =Font.'Segoe UI'
+                                                Height: =42
+                                                HoverColor: =RGBA(255, 255, 255, 1)
+                                                HoverFill: =RGBA(15, 108, 189, 1)
+                                                OnSelect: |-
+                                                  =If(!varM06Busy && !varM06Unknown,
+                                                  Set(varM06Op, "renameEnvironment"); Set(varM06Target, ThisItem.Id);
+                                                  Set(varM06OldServer, ThisItem.Server); Set(varM06OldEnv, ThisItem.Env);
+                                                  Set(varM06NewServer, varM06OldServer); Set(varM06NewEnv, varM06OldEnv);
+                                                  Set(varM06Expected, ForAll(Filter(colM06Rows, Server = varM06OldServer) As proof, {id: proof.Id, version: proof.Version}));
+                                                  Set(varM06Error, ""); Set(varM06Dialog, "edit");
+                                                  Reset(txtM06Server); Reset(txtM06Env)
+                                                  )
+                                                PressedColor: =RGBA(255, 255, 255, 1)
+                                                PressedFill: =RGBA(9, 82, 144, 1)
+                                                RadiusBottomLeft: =4
+                                                RadiusBottomRight: =4
+                                                RadiusTopLeft: =4
+                                                RadiusTopRight: =4
+                                                Size: =12
+                                                Text: ="名称を変更"
+                                                Tooltip: ="名称を変更"
+                                                Width: =116
+                                                X: =14
+                                                Y: =envM06Name.Y + envM06Name.Height + 12
+                                          - envM06Toggle:
+                                              Control: Classic/Button
+                                              Properties:
+                                                BorderColor: =RGBA(208, 220, 234, 1)
+                                                BorderThickness: =1
+                                                Color: =RGBA(25, 54, 92, 1)
+                                                DisplayMode: =If(varM06Busy || varM06Unknown || (!ThisItem.EnvEnabled && !Coalesce(LookUp(colM06Rows, Server = varM06Server).ServerEnabled, false)), DisplayMode.Disabled, DisplayMode.Edit)
+                                                Fill: =RGBA(255, 255, 255, 1)
+                                                Font: =Font.'Segoe UI'
+                                                Height: =42
+                                                HoverColor: =RGBA(255, 255, 255, 1)
+                                                HoverFill: =RGBA(15, 108, 189, 1)
+                                                OnSelect: |-
+                                                  =If(!varM06Busy && !varM06Unknown,
+                                                  Set(varM06Op, If(ThisItem.EnvEnabled, "endEnvironment", "reactivateEnvironment")); Set(varM06Target, ThisItem.Id);
+                                                  Set(varM06OldServer, ThisItem.Server); Set(varM06OldEnv, ThisItem.Env);
+                                                  Set(varM06NewServer, varM06OldServer); Set(varM06NewEnv, varM06OldEnv);
+                                                  Set(varM06Expected, ForAll(Filter(colM06Rows, Server = varM06OldServer) As proof, {id: proof.Id, version: proof.Version}));
+                                                  Set(varM06Error, ""); Set(varM06Dialog, "confirm");
+                                                  Reset(txtM06Server); Reset(txtM06Env)
+                                                  )
+                                                PressedColor: =RGBA(255, 255, 255, 1)
+                                                PressedFill: =RGBA(9, 82, 144, 1)
+                                                RadiusBottomLeft: =4
+                                                RadiusBottomRight: =4
+                                                RadiusTopLeft: =4
+                                                RadiusTopRight: =4
+                                                Size: =12
+                                                Text: =If(ThisItem.EnvEnabled, "使用を終了", "再び使用する")
+                                                Tooltip: =If(ThisItem.EnvEnabled, "使用を終了", "再び使用する")
+                                                Width: =144
+                                                X: =If(Parent.TemplateWidth < 310, 14, 142)
+                                                Y: =envM06Name.Y + envM06Name.Height + If(Parent.TemplateWidth < 310, 66, 12)
+                                    - envM06Empty:
+                                        Control: Label
+                                        Properties:
+                                          Color: =RGBA(25, 54, 92, 1)
+                                          Font: =Font.'Segoe UI'
+                                          Height: =48
+                                          Size: =14
+                                          Text: ="該当する環境はありません。"
+                                          Visible: =CountRows(SortByColumns(Filter(colM06Rows, Server = varM06Server && EnvEnabled = varM06EnvActive), "Env", SortOrder.Ascending)) = 0
+                                          Width: =Parent.Width - 36
+                                          X: =18
+                                          Y: =envM06List.Y
+                  - lblM06ServerContext:
+                      Control: Label
+                      Properties:
+                        AutoHeight: =true
+                        Color: =RGBA(25, 54, 92, 1)
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Bold
+                        Height: =42
+                        Role: =TextRole.Heading2
+                        Size: =20
+                        TabIndex: =0
+                        Text: =If(IsBlank(varM06Server), "環境", varM06Server & "の環境")
+                        Width: =envM06Panel.Width - 180
+                        X: =conM06Center.X + pnlM06Lists.X + envM06Panel.X + 18
+                        Y: =conM06Center.Y + pnlM06Lists.Y + envM06Panel.Y + 18
+      - conM06DialogScroll:
+          Control: GroupContainer
+          Variant: AutoLayout
+          Properties:
+            DropShadow: =DropShadow.None
+            Fill: =RGBA(0, 0, 0, 0.4)
+            Height: =Parent.Height
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutOverflowY: =LayoutOverflow.Scroll
+            PaddingBottom: =24
+            PaddingTop: =24
+            Visible: =!IsBlank(varM06Dialog)
+            Width: =Parent.Width
+          Children:
+            - conM06Dialog:
+                Control: GroupContainer
+                Variant: ManualLayout
+                Properties:
+                  AlignInContainer: =AlignInContainer.Center
+                  DropShadow: =DropShadow.None
+                  Fill: =RGBA(255, 255, 255, 1)
+                  FillPortions: =0
+                  Height: =If(varM06Unknown, btnM06DialogReload.Y + 66, btnM06Cancel.Y + 66)
+                  LayoutMinHeight: =0
+                  LayoutMinWidth: =0
+                  Width: =Min(Parent.Width - 32, 600)
+                Children:
+                  - lblM06DialogTitle:
+                      Control: Label
+                      Properties:
+                        AutoHeight: =true
+                        Color: =RGBA(25, 54, 92, 1)
+                        Font: =Font.'Segoe UI'
+                        FontWeight: =FontWeight.Bold
+                        Height: =52
+                        Size: =18
+                        Text: =If(varM06Dialog = "edit", Switch(varM06Op, "addServer", "サーバーを追加", "addEnvironment", varM06OldServer & "に環境を追加", "renameServer", "サーバー名を変更", "renameEnvironment", "環境名を変更", "確認"), Switch(varM06Op, "renameServer", "サーバー名を「" & varM06OldServer & "」から「" & varM06NewServer & "」に変更しますか？", "renameEnvironment", "環境名を「" & varM06OldEnv & "」から「" & varM06NewEnv & "」に変更しますか？", "確認"))
+                        Width: =Parent.Width - 48
+                        X: =24
+                        Y: =18
+                  - lblM06ServerInput:
+                      Control: Label
+                      Properties:
+                        Color: =RGBA(25, 54, 92, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =30
+                        Size: =14
+                        Text: ="サーバー名"
+                        Visible: =varM06Dialog = "edit" && (varM06Op = "addServer" || varM06Op = "renameServer")
+                        Width: =Parent.Width - 48
+                        X: =24
+                        Y: =lblM06DialogTitle.Y + lblM06DialogTitle.Height + 16
+                  - txtM06Server:
+                      Control: Classic/TextInput
+                      Properties:
+                        AccessibleLabel: ="サーバー名"
+                        BorderColor: =RGBA(208, 220, 234, 1)
+                        Color: =RGBA(25, 54, 92, 1)
+                        Default: =Coalesce(varM06OldServer, "")
+                        DisplayMode: =If(varM06Busy, DisplayMode.Disabled, DisplayMode.Edit)
+                        FocusedBorderColor: =RGBA(15, 108, 189, 1)
+                        Height: =42
+                        HoverBorderColor: =RGBA(15, 108, 189, 1)
+                        MaxLength: =101
+                        Visible: =varM06Dialog = "edit" && (varM06Op = "addServer" || varM06Op = "renameServer")
+                        Width: =Parent.Width - 48
+                        X: =24
+                        Y: =lblM06ServerInput.Y + 34
+                  - lblM06EnvInput:
+                      Control: Label
+                      Properties:
+                        Color: =RGBA(25, 54, 92, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =30
+                        Size: =14
+                        Text: ="対象の環境名"
+                        Visible: =varM06Dialog = "edit" && (varM06Op = "addServer" || varM06Op = "addEnvironment" || varM06Op = "renameEnvironment")
+                        Width: =Parent.Width - 48
+                        X: =24
+                        Y: =If(txtM06Server.Visible, txtM06Server.Y + 58, lblM06DialogTitle.Y + lblM06DialogTitle.Height + 16)
+                  - txtM06Env:
+                      Control: Classic/TextInput
+                      Properties:
+                        AccessibleLabel: ="対象の環境名"
+                        BorderColor: =RGBA(208, 220, 234, 1)
+                        Color: =RGBA(25, 54, 92, 1)
+                        Default: =Coalesce(varM06OldEnv, "")
+                        DisplayMode: =If(varM06Busy, DisplayMode.Disabled, DisplayMode.Edit)
+                        FocusedBorderColor: =RGBA(15, 108, 189, 1)
+                        Height: =42
+                        HoverBorderColor: =RGBA(15, 108, 189, 1)
+                        MaxLength: =101
+                        Visible: =varM06Dialog = "edit" && (varM06Op = "addServer" || varM06Op = "addEnvironment" || varM06Op = "renameEnvironment")
+                        Width: =Parent.Width - 48
+                        X: =24
+                        Y: =lblM06EnvInput.Y + 34
+                  - lblM06ConfirmBody:
+                      Control: Label
+                      Properties:
+                        AutoHeight: =true
+                        Color: =RGBA(25, 54, 92, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =52
+                        Size: =14
+                        Text: |-
+                          =Switch(varM06Op,
+                          "renameServer", "このサーバー内のすべての環境に適用されます。" & Char(10) & "ログに書かれているサーバー名も「" & varM06NewServer & "」になっていることを確認してください。",
+                          "renameEnvironment", "ログに書かれている環境名も「" & varM06NewEnv & "」になっていることを確認してください。",
+                          "endServer", varM06OldServer & "を使用終了にしますか？ このサーバー内のすべての環境が使用できなくなります。",
+                          "endEnvironment", varM06OldEnv & "を使用終了にしますか？ このサーバーでは、この環境が使用できなくなります。",
+                          "reactivateServer", varM06OldServer & "を再び使用しますか？",
+                          "reactivateEnvironment", varM06OldEnv & "を再び使用しますか？", "")
+                        Visible: =varM06Dialog = "confirm"
+                        Width: =Parent.Width - 48
+                        X: =24
+                        Y: =lblM06DialogTitle.Y + lblM06DialogTitle.Height + 16
+                  - lblM06DialogError:
+                      Control: Label
+                      Properties:
+                        AutoHeight: =true
+                        Color: =RGBA(163, 38, 45, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =42
+                        Size: =14
+                        Text: =varM06Error
+                        Width: =Parent.Width - 48
+                        X: =24
+                        Y: =If(varM06Dialog = "confirm", lblM06ConfirmBody.Y + lblM06ConfirmBody.Height + 12, If(txtM06Env.Visible, txtM06Env.Y + 54, txtM06Server.Y + 54))
+                  - btnM06Cancel:
+                      Control: Classic/Button
+                      Properties:
+                        BorderColor: =RGBA(208, 220, 234, 1)
+                        BorderThickness: =1
+                        Color: =RGBA(25, 54, 92, 1)
+                        DisplayMode: =If(varM06Busy, DisplayMode.Disabled, DisplayMode.Edit)
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =42
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =RGBA(15, 108, 189, 1)
+                        OnSelect: =Set(varM06Dialog, ""); Set(varM06Error, "")
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(9, 82, 144, 1)
+                        RadiusBottomLeft: =4
+                        RadiusBottomRight: =4
+                        RadiusTopLeft: =4
+                        RadiusTopRight: =4
+                        Size: =12
+                        Text: ="キャンセル"
+                        Tooltip: ="キャンセル"
+                        Width: =116
+                        X: =24
+                        Y: =lblM06DialogError.Y + lblM06DialogError.Height + 12
+                  - btnM06Continue:
+                      Control: Classic/Button
+                      Properties:
+                        BorderColor: =RGBA(15, 108, 189, 1)
+                        BorderThickness: =1
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisplayMode: =If(varM06Busy || varM06Unknown || !varM06Ready, DisplayMode.Disabled, DisplayMode.Edit)
+                        Fill: =RGBA(15, 108, 189, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =42
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =RGBA(15, 108, 189, 1)
+                        OnSelect: |-
+                          =Set(varM06NewServer, Trim(txtM06Server.Text)); Set(varM06NewEnv, Trim(txtM06Env.Text));
+                          Set(varM06Error,
+                          If((varM06Op = "addServer" || varM06Op = "renameServer") && IsBlank(varM06NewServer), "サーバー名を入力してください。",
+                          (varM06Op = "addServer" || varM06Op = "renameServer") && Len(varM06NewServer) > 100, "サーバー名は100文字以内で入力してください。",
+                          (varM06Op = "addServer" || varM06Op = "renameServer") && CountIf(colM06Rows, Lower(Trim(Server)) = Lower(varM06NewServer) && (varM06Op = "addServer" || Server <> varM06OldServer)) > 0, "同じサーバー名が登録されています。",
+                          (varM06Op = "addServer" || varM06Op = "addEnvironment" || varM06Op = "renameEnvironment") && IsBlank(varM06NewEnv), "環境名を入力してください。",
+                          Len(varM06NewEnv) > 100, "環境名は100文字以内で入力してください。",
+                          (varM06Op = "addEnvironment" || varM06Op = "renameEnvironment") && CountIf(colM06Rows, Server = varM06OldServer && Lower(Trim(Env)) = Lower(varM06NewEnv) && (varM06Op = "addEnvironment" || Id <> varM06Target)) > 0, "このサーバーに同じ環境名が登録されています。", ""));
+                          If(IsBlank(varM06Error), If(varM06Op = "renameServer" || varM06Op = "renameEnvironment", Set(varM06Dialog, "confirm"), Select(btnM06Commit)))
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(9, 82, 144, 1)
+                        RadiusBottomLeft: =4
+                        RadiusBottomRight: =4
+                        RadiusTopLeft: =4
+                        RadiusTopRight: =4
+                        Size: =12
+                        Text: =If(varM06Op = "addServer" || varM06Op = "addEnvironment", "追加する", "変更を保存")
+                        Tooltip: =If(varM06Op = "addServer" || varM06Op = "addEnvironment", "追加する", "変更を保存")
+                        Visible: =varM06Dialog = "edit"
+                        Width: =146
+                        X: =Parent.Width - 170
+                        Y: =btnM06Cancel.Y
+                  - btnM06Commit:
+                      Control: Classic/Button
+                      Properties:
+                        BorderColor: =RGBA(15, 108, 189, 1)
+                        BorderThickness: =1
+                        Color: =RGBA(255, 255, 255, 1)
+                        DisplayMode: =If(varM06Busy || varM06Unknown || !varM06Ready, DisplayMode.Disabled, DisplayMode.Edit)
+                        Fill: =RGBA(15, 108, 189, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =42
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =RGBA(15, 108, 189, 1)
+                        OnSelect: |-
+                          =If(!varM06Busy && !varM06Unknown,
+                          Set(varM06Busy, true); Set(varM06Error, "");
+                          IfError(Set(varM06Reply, '架空ログ証跡_環境サーバー管理'.Run(JSON({managementModel: "server-first-v1", operation: varM06Op, targetId: Coalesce(varM06Target, ""),
+                           expectedRows: varM06Expected, server: varM06NewServer, environment: varM06NewEnv}, JSONFormat.Compact)));
+                          Set(varM06Parsed, ParseJSON(varM06Reply.result));
+                          If(Boolean(varM06Parsed.ok),
+                            ClearCollect(colM06Rows, ForAll(Table(varM06Parsed.rows) As saved, {
+                              Id: Text(saved.Value.id), Version: Text(saved.Value.version),
+                              Server: Text(saved.Value.server), Env: Text(saved.Value.environment),
+                              ServerEnabled: Boolean(saved.Value.serverEnabled), EnvEnabled: Boolean(saved.Value.environmentEnabled)
+                            }));
+                            Set(varM06Unknown, false);
+                            Set(varM06Error, "");
+                            Set(varM06Dialog, "");
+                            If(varM06Op = "renameServer" || varM06Op = "addServer", Set(varM06Server, varM06NewServer));
+                            If(IsBlank(LookUp(colM06Rows, Server = varM06Server)), Set(varM06Server, First(Filter(colM06Rows, ServerEnabled)).Server));
+                            Set(varM06Ready, true),
+                            Set(varM06Error, Text(varM06Parsed.reason));
+                            If(("読み直して" in varM06Error || "画面を開き直して" in varM06Error), Set(varM06Unknown, true))
+                          ),
+                          Set(varM06Error, "保存結果を確認できません。読み直してから登録内容を確認してください。"); Set(varM06Unknown, true));
+                          Set(varM06Busy, false))
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(9, 82, 144, 1)
+                        RadiusBottomLeft: =4
+                        RadiusBottomRight: =4
+                        RadiusTopLeft: =4
+                        RadiusTopRight: =4
+                        Size: =12
+                        Text: =Switch(varM06Op, "endServer", "使用を終了", "endEnvironment", "使用を終了", "reactivateServer", "再び使用する", "reactivateEnvironment", "再び使用する", "変更する")
+                        Tooltip: =Switch(varM06Op, "endServer", "使用を終了", "endEnvironment", "使用を終了", "reactivateServer", "再び使用する", "reactivateEnvironment", "再び使用する", "変更する")
+                        Visible: =varM06Dialog = "confirm"
+                        Width: =146
+                        X: =Parent.Width - 170
+                        Y: =btnM06Cancel.Y
+                  - btnM06DialogReload:
+                      Control: Classic/Button
+                      Properties:
+                        BorderColor: =RGBA(208, 220, 234, 1)
+                        BorderThickness: =1
+                        Color: =RGBA(25, 54, 92, 1)
+                        DisplayMode: =If(varM06Busy, DisplayMode.Disabled, DisplayMode.Edit)
+                        Fill: =RGBA(255, 255, 255, 1)
+                        Font: =Font.'Segoe UI'
+                        Height: =42
+                        HoverColor: =RGBA(255, 255, 255, 1)
+                        HoverFill: =RGBA(15, 108, 189, 1)
+                        OnSelect: |-
+                          =If(!varM06Busy,
+                          Set(varM06Busy, true); Set(varM06Error, ""); Set(varM06Op, "list");
+                          IfError(Set(varM06Reply, '架空ログ証跡_環境サーバー管理'.Run(JSON({operation: "list"}, JSONFormat.Compact)));
+                          Set(varM06Parsed, ParseJSON(varM06Reply.result));
+                          If(Boolean(varM06Parsed.ok),
+                            ClearCollect(colM06Rows, ForAll(Table(varM06Parsed.rows) As saved, {
+                              Id: Text(saved.Value.id), Version: Text(saved.Value.version),
+                              Server: Text(saved.Value.server), Env: Text(saved.Value.environment),
+                              ServerEnabled: Boolean(saved.Value.serverEnabled), EnvEnabled: Boolean(saved.Value.environmentEnabled)
+                            }));
+                            Set(varM06Unknown, false);
+                            Set(varM06Error, "");
+                            Set(varM06Dialog, "");
+                            If(varM06Op = "renameServer" || varM06Op = "addServer", Set(varM06Server, varM06NewServer));
+                            If(IsBlank(LookUp(colM06Rows, Server = varM06Server)), Set(varM06Server, First(Filter(colM06Rows, ServerEnabled)).Server));
+                            Set(varM06Ready, true),
+                            Set(varM06Error, Text(varM06Parsed.reason));
+                            If(("読み直して" in varM06Error || "画面を開き直して" in varM06Error), Set(varM06Unknown, true))
+                          ),
+                          Set(varM06Error, "登録内容を読み取れません。読み直してから操作してください。"); Set(varM06Unknown, true));
+                          Set(varM06Busy, false))
+                        PressedColor: =RGBA(255, 255, 255, 1)
+                        PressedFill: =RGBA(9, 82, 144, 1)
+                        RadiusBottomLeft: =4
+                        RadiusBottomRight: =4
+                        RadiusTopLeft: =4
+                        RadiusTopRight: =4
+                        Size: =12
+                        Text: ="読み直す"
+                        Tooltip: ="読み直す"
+                        Visible: =varM06Unknown
+                        Width: =116
+                        X: =24
+                        Y: =btnM06Cancel.Y + 54

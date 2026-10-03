@@ -1,4 +1,6 @@
 # Local credentials and private configuration
+# Environment/server management live backups, connection references and generated candidates
+outputs/environment-management-*/
 .env
 .env.*
 !.env.example
@@ -6,6 +8,7 @@
 *.p12
 *.pem
 *.key
+*.snk
 *.publishsettings
 
 # Generated build and test files
@@ -113,6 +116,7 @@ outputs/flow-implementation/sharepoint-teams-preflight-live-flow.json
 outputs/ui-cleanup-*/
 outputs/cleanup-execution-*/
 outputs/review-ux-*/
+outputs/direct-review-folder-*/
 outputs/mq-group1-*/
 outputs/date-independent-20261001/*
 !outputs/date-independent-20261001/test_date_independent.py
@@ -132,3 +136,9 @@ outputs/rewrite_screen1_repeat.py
 
 # One-off local Git inventory, checks, and command output
 outputs/git-delivery-*/
+
+# Local test-reset inventory, tenant record links and generated verification files
+outputs/test-reset-*/
+
+# User-entered test results stay local; artificial input fixtures are tracked
+outputs/再テスト用ファイル_*/テスト結果記録.csv
